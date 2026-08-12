@@ -1,0 +1,58 @@
+{
+  "auto/ep1_lv1_20260813_014633.pth": {
+    "episode": 1,
+    "level": 1,
+    "epsilon": 0.9972857142857143,
+    "reward": 510.3337700001586,
+    "timestamp": "20260813_014633",
+    "type": "auto"
+  },
+  "auto/ep2_lv2_20260813_014633.pth": {
+    "episode": 2,
+    "level": 2,
+    "epsilon": 0.9945714285714287,
+    "reward": 534.7406355544113,
+    "timestamp": "20260813_014633",
+    "type": "auto"
+  },
+  "auto/ep3_lv3_20260813_014635.pth": {
+    "episode": 3,
+    "level": 3,
+    "epsilon": 0.991857142857143,
+    "reward": 536.2211819557317,
+    "timestamp": "20260813_014635",
+    "type": "auto"
+  },
+  "auto/ep4_lv4_20260813_014635.pth": {
+    "episode": 4,
+    "level": 4,
+    "epsilon": 0.9891428571428573,
+    "reward": 516.0460588232513,
+    "timestamp": "20260813_014635",
+    "type": "auto"
+  },
+  "auto/ep5_lv5_20260813_014636.pth": {
+    "episode": 5,
+    "level": 5,
+    "epsilon": 0.9864285714285717,
+    "reward": 512.1859584319386,
+    "timestamp": "20260813_014636",
+    "type": "auto"
+  },
+  "auto/ep6_lv6_20260813_014637.pth": {
+    "episode": 6,
+    "level": 6,
+    "epsilon": 0.983714285714286,
+    "reward": 547.5991772950085,
+    "timestamp": "20260813_014637",
+    "type": "auto"
+  },
+  "auto/ep7_lv7_20260813_014638.pth": {
+    "episode": 7,
+    "level": 7,
+    "epsilon": 0.9810000000000003,
+    "reward": 584.3505538167028,
+    "timestamp": "20260813_014638",
+    "type": "auto"
+  }
+}
