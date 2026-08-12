@@ -81,7 +81,7 @@ class BobsFacilityApp:
         subtitle_lbl.pack(anchor='w', pady=(2, 0))
         
         sep = ttk.Separator(self.root, orient='horizontal')
-        sep.pack(fill='x', px=15, py=5)
+        sep.pack(fill='x', padx=15, pady=5)
 
     def _build_facility_selector(self):
         sec_lbl = tk.Label(self.root, text="SELECT TESTING FACILITY & ENVIRONMENT", bg="#0c1017", fg="#00f0ff", font=('Segoe UI', 11, 'bold'))
@@ -102,7 +102,7 @@ class BobsFacilityApp:
             bg="#1a2332", fg="#94a3b8", font=('Segoe UI', 9), justify='left'
         )
         f1_desc.pack(anchor='w', pady=4)
-        f1_badge = tk.Label(card1, text="ACTIVE FACILITY", bg="#059669", fg="#ffffff", font=('Segoe UI', 8, 'bold'), px=6, py=2)
+        f1_badge = tk.Label(card1, text="ACTIVE FACILITY", bg="#059669", fg="#ffffff", font=('Segoe UI', 8, 'bold'), padx=6, pady=2)
         f1_badge.pack(anchor='e', pady=(4, 0))
         
         # Facility Card 2 (LOCKED)
@@ -117,7 +117,7 @@ class BobsFacilityApp:
             bg="#111827", fg="#4b5563", font=('Segoe UI', 9), justify='left'
         )
         f2_desc.pack(anchor='w', pady=4)
-        f2_badge = tk.Label(card2, text="IN DEVELOPMENT", bg="#374151", fg="#9ca3af", font=('Segoe UI', 8, 'bold'), px=6, py=2)
+        f2_badge = tk.Label(card2, text="IN DEVELOPMENT", bg="#374151", fg="#9ca3af", font=('Segoe UI', 8, 'bold'), padx=6, pady=2)
         f2_badge.pack(anchor='e', pady=(4, 0))
         
         # Facility Card 3 (LOCKED)
@@ -132,7 +132,7 @@ class BobsFacilityApp:
             bg="#111827", fg="#4b5563", font=('Segoe UI', 9), justify='left'
         )
         f3_desc.pack(anchor='w', pady=4)
-        f3_badge = tk.Label(card3, text="LOCKED", bg="#374151", fg="#9ca3af", font=('Segoe UI', 8, 'bold'), px=6, py=2)
+        f3_badge = tk.Label(card3, text="LOCKED", bg="#374151", fg="#9ca3af", font=('Segoe UI', 8, 'bold'), padx=6, pady=2)
         f3_badge.pack(anchor='e', pady=(4, 0))
 
     def _build_dashboard_controls(self):
