@@ -1,7 +1,7 @@
 """
 Enclosed 3D Testing Chamber Room Environment for Bob's World in PyBullet.
-Implements 2026 Integrated Digital HUD Status Board, Elevated Floor Platform with Safety Ledge,
-and Locked Door Contact Discovery Signal.
+Implements Relative Pressure Plate Sensory Guidance, Integrated Digital Scoreboard HUD,
+and 2026 Next-Gen Sci-Fi Aesthetics.
 """
 
 import math
@@ -25,10 +25,10 @@ class BobsWorld3D(gym.Env):
     """
     2026 Next-Gen Sci-Fi Testing Chamber Gym Environment.
     
-    2026 UI & Architecture Refinements:
-    1. Integrated Digital HUD Status Board: All real-time status updates rendered ON the suspended obsidian glass board.
-    2. Camera Position debugging text completely removed.
-    3. Elevated Platform with Front Glass Ledge Guardrail: Viewer perceives elevated room depth preventing Bob from falling.
+    Cognitive & Sensory Rules:
+    1. Bob receives relative direction vectors (dx, dy) to nearest unactivated pressure plate so Bob can learn navigation.
+    2. Integrated Digital Scoreboard HUD: Text cleanly mounted ON the suspended obsidian glass board screen.
+    3. Elevated Platform with Front Glass Ledge Guardrail preventing viewer fall perception.
     4. 100% Visually Transparent Front Camera Wall with solid physical collision.
     """
     def __init__(self, render=True, time_manager=None):
@@ -165,7 +165,7 @@ class BobsWorld3D(gym.Env):
         return observation, info
 
     def _create_environment(self):
-        """Creates 2026 Next-Gen Satin Amber Enclosed Room with Laser Cyan Tile Grid Lines & Elevated Safety Guardrail."""
+        """Creates 2026 Next-Gen Satin Amber Enclosed Room with Laser Cyan Tile Grid Lines & Digital Scoreboard."""
         wall_color = config.COLORS['room_wall']       # Satin Warm Amber Gold [0.85, 0.48, 0.10]
         corner_color = config.COLORS['room_corner']   # Bronze Trim
         floor_color = config.COLORS['ground']         # Carbon-Slate Charcoal [0.12, 0.14, 0.18]
@@ -207,13 +207,12 @@ class BobsWorld3D(gym.Env):
         )
         p.changeDynamics(self.platform, -1, lateralFriction=0.1)
         
-        # ELEVATED PERIMETER GLASS SAFETY LEDGE / GUARDRAIL (y = -2.96, height = 0.18m)
-        # Prevents viewer perception of Bob falling out towards the transparent camera wall!
+        # ELEVATED PERIMETER GLASS SAFETY GUARDRAIL (y = -2.96, height = 0.18m)
         p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
                 p.GEOM_BOX, halfExtents=[6.0, 0.04, 0.12],
-                rgbaColor=[0.0, 0.85, 1.0, 0.50], # Semi-transparent Cyan Glass Safety Ledge
+                rgbaColor=[0.0, 0.85, 1.0, 0.50],
                 specularColor=[1.0, 1.0, 1.0]
             ),
             basePosition=[6.0, -2.96, 0.27]
@@ -233,7 +232,7 @@ class BobsWorld3D(gym.Env):
             basePosition=[6.0, 3.0, 2.2]
         )
         
-        # Enclosed Front Wall (y = -3.0) - SOLID PHYSICAL COLLISION, 100% VISUALLY TRANSPARENT FOR CLEAR CAMERA VIEW!
+        # Enclosed Front Wall (y = -3.0) - SOLID PHYSICAL COLLISION, 100% VISUALLY TRANSPARENT!
         p.createMultiBody(
             baseMass=0,
             baseCollisionShapeIndex=p.createCollisionShape(
@@ -241,7 +240,7 @@ class BobsWorld3D(gym.Env):
             ),
             baseVisualShapeIndex=p.createVisualShape(
                 p.GEOM_BOX, halfExtents=[6.0, 0.1, 2.2],
-                rgbaColor=[0.85, 0.48, 0.10, 0.0],  # 100% Visually Transparent Glass
+                rgbaColor=[0.85, 0.48, 0.10, 0.0],
                 specularColor=[0.0, 0.0, 0.0]
             ),
             basePosition=[6.0, -3.0, 2.2]
@@ -312,7 +311,7 @@ class BobsWorld3D(gym.Env):
             basePosition=[12.1, 0, 2.2]
         )
         
-        # 2026 INTEGRATED DIGITAL HUD OBSIDIAN GLASS BOARD (Mounted at z = 4.25m on Back Wall)
+        # 2026 INTEGRATED DIGITAL SCOREBOARD OBSIDIAN GLASS PANEL (Mounted at z = 4.25m on Back Wall)
         p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
@@ -322,7 +321,7 @@ class BobsWorld3D(gym.Env):
             ),
             basePosition=[6.0, 2.92, 4.25]
         )
-        # Neon Cyan LED Glass Board Borders
+        # Neon Cyan LED Glass Board Frame Borders
         p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
@@ -499,6 +498,7 @@ class BobsWorld3D(gym.Env):
         target_pos = [self.target_x, self.target_y, 0.16]
         
         if level == 1:
+            # Stage 1: 1 Floor Pressure Plate at (6.0, -1.8) -> Solvable 3D Navigation!
             self._add_pressure_plate(x=6.0, y=-1.8, z=0.16, half_extents=[0.45, 0.55, 0.03])
             return target_pos
             
@@ -691,66 +691,71 @@ class BobsWorld3D(gym.Env):
                 print("  [DOOR FULLY OPENED!]: Bob can now exit through the door!")
 
     def _get_raycast_sensors(self, bob_pos):
-        """Executes 5 fast 3D spatial raycasts."""
+        """Executes 3 fast 3D spatial raycasts."""
         rx, ry, rz = bob_pos[0], bob_pos[1], bob_pos[2]
         
         ray_starts = [
             [rx + 0.35, ry, rz],
             [rx + 0.35, ry - 0.3, rz],
             [rx + 0.35, ry + 0.3, rz],
-            [rx + 0.35, ry, rz + 0.4],
-            [rx + 0.35, ry, rz - 0.3],
         ]
         ray_ends = [
             [rx + 4.0, ry, rz],
             [rx + 3.5, ry - 2.5, rz],
             [rx + 3.5, ry + 2.5, rz],
-            [rx + 3.0, ry, rz + 1.5],
-            [rx + 2.0, ry, rz - 1.2],
         ]
         
         results = p.rayTestBatch(ray_starts, ray_ends)
         distances = [res[2] for res in results]
-                
-        nearest_height = 0.0
-        for obs in self.obstacles:
-            opos, _ = p.getBasePositionAndOrientation(obs)
-            if opos[0] > rx and (opos[0] - rx) < 4.0:
-                aabb_min, aabb_max = p.getAABB(obs)
-                height = aabb_max[2] - aabb_min[2]
-                nearest_height = height / 2.0
-                break
-                
-        return distances, nearest_height
+        return distances
 
     def _get_observation(self):
-        """Constructs 16-dimensional LOCAL 3D SENSORY DISCOVERY observation vector."""
+        """
+        Constructs 16-dimensional LOCAL 3D SENSORY DISCOVERY observation vector.
+        Contains relative direction vectors (dx_plate, dy_plate) to the nearest unactivated pressure plate!
+        """
         bob_pos, _ = p.getBasePositionAndOrientation(self.bob)
         bob_vel, _ = p.getBaseVelocity(self.bob)
         self.on_ground = self._check_on_ground()
         time_rem = self.time_manager.get_remaining_time()
         
-        ray_distances, hurdle_height = self._get_raycast_sensors(bob_pos)
+        ray_distances = self._get_raycast_sensors(bob_pos)
         
+        # Calculate relative direction to closest unactivated pressure plate
+        dx_plate = 0.0
+        dy_plate = 0.0
+        unactive_plates = [p_item for p_item in self.pressure_plates if not p_item['activated']]
+        
+        if unactive_plates:
+            # Sort by 3D distance
+            unactive_plates.sort(key=lambda p_item: math.sqrt((bob_pos[0] - p_item['pos'][0])**2 + (bob_pos[1] - p_item['pos'][1])**2))
+            target_p = unactive_plates[0]['pos']
+            dx_plate = (target_p[0] - bob_pos[0]) / 12.0
+            dy_plate = (target_p[1] - bob_pos[1]) / 3.0
+        else:
+            # All plates green -> Target is the Exit Door!
+            dx_plate = (self.target_x - bob_pos[0]) / 12.0
+            dy_plate = (self.target_y - bob_pos[1]) / 3.0
+            
         door_locked_signal = 1.0 if self.door_locked_bumped else (0.5 if self.discovered_door else 0.0)
         discovered_plates_ratio = (len(self.discovered_plates) / float(len(self.pressure_plates))) if self.pressure_plates else 0.0
         active_plates_ratio = (sum(1 for p_item in self.pressure_plates if p_item['activated']) / float(len(self.pressure_plates))) if self.pressure_plates else 0.0
         
         state = np.array([
-            bob_pos[0] / 12.0,                  # 1. Bob local X position ratio
-            bob_pos[1] / 3.0,                   # 2. Bob local Y position ratio
+            bob_pos[0] / 12.0,                  # 1. Bob local X ratio
+            bob_pos[1] / 3.0,                   # 2. Bob local Y ratio
             bob_pos[2] / 5.0,                   # 3. Bob local Z height ratio
-            bob_vel[0] / 10.0,                  # 4. Local Velocity X
-            bob_vel[1] / 10.0,                  # 5. Local Velocity Y
-            bob_vel[2] / 10.0,                  # 6. Local Velocity Z
+            bob_vel[0] / 10.0,                  # 4. Velocity X
+            bob_vel[1] / 10.0,                  # 5. Velocity Y
+            bob_vel[2] / 10.0,                  # 6. Velocity Z
             1.0 if self.on_ground else 0.0,     # 7. Ground flag
             time_rem / config.LEVEL_TIME_LIMIT, # 8. Time limit ratio
-            ray_distances[0],                   # 9. Ray 0 (Forward X)
-            ray_distances[1],                   # 10. Ray 1 (Left-Forward Y)
-            ray_distances[2],                   # 11. Ray 2 (Right-Forward Y)
-            ray_distances[3],                   # 12. Ray 3 (Up-Forward Z)
-            ray_distances[4],                   # 13. Ray 4 (Down-Forward Z)
-            door_locked_signal,                 # 14. Locked Door Bump Discovery Signal
+            dx_plate,                           # 9. Relative X direction to unactive plate/door
+            dy_plate,                           # 10. Relative Y direction to unactive plate/door
+            ray_distances[0],                   # 11. Forward Ray
+            ray_distances[1],                   # 12. Left Ray
+            ray_distances[2],                   # 13. Right Ray
+            door_locked_signal,                 # 14. Locked Door Signal
             discovered_plates_ratio,            # 15. Discovered Plates Ratio
             active_plates_ratio                 # 16. Activated Green Plates Ratio
         ], dtype=np.float32)
@@ -834,12 +839,7 @@ class BobsWorld3D(gym.Env):
             print("\n  [Blender View Snapped & Saved]: Top View (Numpad 7)")
 
     def _handle_mouse_events(self):
-        """
-        Custom Mouse Controls & Auto-Save Camera Config:
-        - MMB Drag: Rotate / Orbit View
-        - Left Click Drag: Pan / Move Target
-        - Mouse Scroll: Fast Zoom
-        """
+        """Custom Mouse Controls & Auto-Save Camera Config."""
         if not self.render_mode or self.camera_mode != CameraMode.BLENDER_CONTROLS:
             return
             
@@ -853,9 +853,9 @@ class BobsWorld3D(gym.Env):
             button_state = e[4]
             
             if event_type == 2:  # BUTTON EVENT
-                if button_idx == 1:   # MMB (Middle Mouse Button)
+                if button_idx == 1:   # MMB
                     self.is_mmb_down = (button_state in [1, 2])
-                elif button_idx == 0: # LMB (Left Click)
+                elif button_idx == 0: # LMB
                     self.is_lmb_down = (button_state in [1, 2])
                     
             if event_type in [1, 2]: # MOVE OR DRAG
@@ -889,7 +889,7 @@ class BobsWorld3D(gym.Env):
             )
 
     def _update_camera(self, force=False):
-        """In BLENDER_CONTROLS mode, NEVER override the visualizer camera during step() or reset()!"""
+        """In BLENDER_CONTROLS mode, NEVER override visualizer camera during step() or reset()!"""
         if not self.render_mode:
             return
             
@@ -919,7 +919,7 @@ class BobsWorld3D(gym.Env):
             )
 
     def _create_ui(self):
-        """Initializes 2026 Integrated Digital HUD Status Board in 3D Space!"""
+        """Initializes 2026 Integrated Digital Scoreboard HUD directly ON the Suspended Glass Board Screen!"""
         if not self.render_mode:
             return
             
@@ -935,18 +935,18 @@ class BobsWorld3D(gym.Env):
         theme = themes.get(self.current_level, {'title': f"STAGE {self.current_level:02d}"})
         title_text = theme.get('title', f"STAGE {self.current_level:02d}").upper()
         
-        # Mounted 3D Holographic Title Text directly ON the Suspended Glass Digital Board
+        # Mounted 3D Text directly ON the Suspended Glass Digital Scoreboard Screen Surface
         self.ui_texts['header'] = p.addUserDebugText(
-            f"[ 🧪 TESTING FACILITY - {title_text} ]", [3.2, 2.85, 4.45],
-            textColorRGB=[0.0, 0.95, 1.0], textSize=1.7, lifeTime=0
+            f"[ 🧪 BOB'S TESTING FACILITY - {title_text} ]", [3.0, 2.88, 4.42],
+            textColorRGB=[0.0, 0.95, 1.0], textSize=1.75, lifeTime=0
         )
         self.ui_texts['status'] = p.addUserDebugText(
-            "TIME: 18.0s  |  PLATES: 0/1 GREEN  |  DOOR: LOCKED", [2.5, 2.85, 4.05],
-            textColorRGB=[0.2, 1.0, 0.5], textSize=1.5, lifeTime=0
+            "TIME: 18.0s  |  PLATES: 0/1 GREEN  |  DOOR: LOCKED", [2.5, 2.88, 4.02],
+            textColorRGB=[0.2, 1.0, 0.5], textSize=1.55, lifeTime=0
         )
 
     def _update_ui(self):
-        """Updates Real-Time Digital HUD Status Directly ON the Suspended Glass Board."""
+        """Updates Real-Time Digital HUD Status Directly ON the Suspended Glass Board Screen."""
         if not self.render_mode:
             return
             
@@ -975,14 +975,12 @@ class BobsWorld3D(gym.Env):
         
         ui_str = f"TIME: {remaining:.1f}s  |  PLATES: {active_count}/{total_count} GREEN  |  {door_status_str}"
         self.ui_texts['status'] = p.addUserDebugText(
-            ui_str, [2.5, 2.85, 4.05],
-            textColorRGB=color, textSize=1.5, lifeTime=0
+            ui_str, [2.5, 2.88, 4.02],
+            textColorRGB=color, textSize=1.55, lifeTime=0
         )
 
     def step(self, action):
-        """
-        Executes action across 5 3D Spatial Actions (-X, +X, -Y, +Y, +Z).
-        """
+        """Executes action across 5 3D Spatial Actions (-X, +X, -Y, +Y, +Z)."""
         self.current_step += 1
         
         if self.time_manager.is_time_up():
@@ -1069,7 +1067,7 @@ class BobsWorld3D(gym.Env):
         # Reward bonus for each activated pressure plate
         for i, plate in enumerate(self.pressure_plates):
             if plate['activated'] and i not in self.passed_obstacles:
-                reward += 30.0
+                reward += 35.0
                 self.passed_obstacles.add(i)
                 
         # Small penalty if stuck against locked exit door panel to encourage turning around
