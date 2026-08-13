@@ -1,26 +1,22 @@
 """
 2D Neural Network HUD Window for Bob's RL Agent.
-Spawns as a separate always-on-top Tkinter window alongside the 3D PyBullet environment.
-Renders live neuron nodes, synapse lines, and Q-value bars on a Canvas at 20 FPS.
+Runs on the main thread and uses root.update() to avoid blocking PyBullet.
+Renders live neuron nodes, synapse lines, and Q-value bars on a Canvas.
 """
 
-import threading
 import tkinter as tk
 import numpy as np
 
 
 class NeuralNetworkHUD:
-    """Lightweight 2D HUD window that renders the live neural network graph."""
+    """Lightweight 2D HUD window that runs on the main thread and updates dynamically."""
 
     def __init__(self, agent_ref):
         self.agent = agent_ref
         self.alive = True
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
 
-    def _run(self):
         self.root = tk.Tk()
-        self.root.title("Bob's Neural Network  |  Live Activations")
+        self.root.title("Bob's Neural Network | Live Activations")
         self.root.geometry("680x440+30+30")
         self.root.configure(bg="#080c14")
         self.root.attributes("-topmost", True)
@@ -29,14 +25,14 @@ class NeuralNetworkHUD:
         self.canvas = tk.Canvas(self.root, bg="#080c14", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
 
-        self._draw()
-        self.root.mainloop()
-
     def _on_close(self):
         self.alive = False
-        self.root.destroy()
+        try:
+            self.root.destroy()
+        except:
+            pass
 
-    def _draw(self):
+    def update_hud(self):
         if not self.alive:
             return
 
@@ -57,6 +53,7 @@ class NeuralNetworkHUD:
         inp = np.array(acts.get("input", np.zeros(16)), dtype=float) if acts else np.zeros(16)
         h1 = np.array(acts.get("h1", np.zeros(128)), dtype=float) if acts else np.zeros(128)
         h2 = np.array(acts.get("h2", np.zeros(128)), dtype=float) if acts else np.zeros(128)
+        q_vals = np.array(acts.get("q_values", np.zeros(5)), dtype=float) if acts else np.zeros(5)
         best = int(acts.get("best_action", np.argmax(q_vals))) if acts else 0
 
         # Column X positions
@@ -139,13 +136,15 @@ class NeuralNetworkHUD:
                        text=f"WINNING: {act_labels[best]}  |  Q: {q_vals[best]:+.2f}  |  Close window or press 'N' to hide",
                        fill="#00d0e8", font=("Segoe UI", 9))
 
-        # Schedule next frame (20 FPS)
-        if self.alive:
-            self.root.after(50, self._draw)
+        # Process Tkinter event queue on main thread
+        try:
+            self.root.update()
+        except:
+            self.alive = False
 
     def close(self):
         self.alive = False
         try:
-            self.root.after(0, self.root.destroy)
+            self.root.destroy()
         except:
             pass

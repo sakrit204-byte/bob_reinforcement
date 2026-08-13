@@ -1141,10 +1141,17 @@ class BobsWorld3D(gym.Env):
             if hud is None or not hud.alive:
                 from visualizer import NeuralNetworkHUD
                 self._nn_hud = NeuralNetworkHUD(agent_ref=self.agent)
+            
+            # Update canvas drawing and process Tkinter events on main thread
+            if self._nn_hud.alive:
+                self._nn_hud.update_hud()
+            else:
+                self.show_nn_visualizer = False
+                self._nn_hud = None
         else:
             # Close if open
             hud = getattr(self, '_nn_hud', None)
-            if hud is not None and hud.alive:
+            if hud is not None:
                 hud.close()
                 self._nn_hud = None
 
