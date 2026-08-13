@@ -192,11 +192,18 @@ class BobsFacilityApp:
         btn6.pack(side='left', expand=True, fill='x', padx=4)
         
         btn7 = tk.Button(
-            btn_container2, text="🔄 Reset Model Weights (Dumb Start)", bg="#ef4444", fg="#ffffff",
+            btn_container2, text="🔄 Reset Weights", bg="#ef4444", fg="#ffffff",
             font=('Segoe UI', 10, 'bold'), relief='flat', padx=10, pady=6, cursor='hand2',
             command=self.cmd_reset_weights
         )
         btn7.pack(side='left', expand=True, fill='x', padx=4)
+
+        btn8 = tk.Button(
+            btn_container2, text="🧠 Open 2D Neural Visualizer Window", bg="#059669", fg="#ffffff",
+            font=('Segoe UI', 10, 'bold'), relief='flat', padx=10, pady=6, cursor='hand2',
+            command=self.cmd_open_neural_visualizer
+        )
+        btn8.pack(side='left', expand=True, fill='x', padx=4)
 
     def _build_telemetry_panel(self):
         sec_lbl = tk.Label(self.root, text="STAGE CONFIGURATION & REAL-TIME TELEMETRY", bg="#0c1017", fg="#00f0ff", font=('Segoe UI', 11, 'bold'))
@@ -291,10 +298,13 @@ class BobsFacilityApp:
             messagebox.showwarning("Load Checkpoint", f"No checkpoint file found at {path}")
 
     def cmd_reset_weights(self):
-        if messagebox.askyesno("Reset Model Weights", "Wipe model weights back to PURE DUMB RANDOM initialization?"):
-            self.agent.reset_weights()
-            self.log_msg("Model weights reset to PURE DUMB RANDOM initialization!")
-            self._update_telemetry_labels()
+        self.agent.reset_weights()
+        self.log_msg("Reset neural network model weights to DUMB/BLIND random initialization!")
+
+    def cmd_open_neural_visualizer(self):
+        from visualizer import InteractiveNeuralVisualizer
+        self.log_msg("Opening Interactive 2D Neural Network Visualizer Window...")
+        vis = InteractiveNeuralVisualizer(master=self.root, agent=self.agent)
 
     def _update_telemetry_labels(self):
         self.lbl_eps.config(text=f"Epsilon (Exploration): {self.agent.epsilon:.3f}")
