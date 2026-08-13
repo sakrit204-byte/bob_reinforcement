@@ -962,7 +962,7 @@ class BobsWorld3D(gym.Env):
         self.agent = agent
 
     def _render_nn_visualizer(self):
-        """Renders Live Neural Network Inset Window HUD directly in the 3D viewport on key 'N'!"""
+        """Renders GTA V Minimap-style Live Neural Network Node & Synapse Graph Overlay on key 'N'!"""
         if not self.render_mode or not getattr(self, 'show_nn_visualizer', False):
             if hasattr(self, 'nn_ui_ids'):
                 for uid in self.nn_ui_ids:
@@ -983,66 +983,95 @@ class BobsWorld3D(gym.Env):
                 pass
         self.nn_ui_ids = []
         
-        # Check if agent activations are available
         acts = getattr(self.agent, 'latest_activations', None) if getattr(self, 'agent', None) else None
         
-        # Inset Window Screen Anchor Coordinates
-        anchor_x, anchor_y, anchor_z = 0.5, 2.60, 3.80
+        # GTA V Inset Window Screen Position (Fixed 3D Glass Panel Frame Overlay)
+        anchor_x, anchor_y, anchor_z = 0.6, 2.65, 3.85
         
-        # Title Header
-        title_id = p.addUserDebugText(
-            "🧠 [ LIVE NEURAL NETWORK BRAIN INSET - PRESS 'N' TO CLOSE ]",
+        # Glass Backdrop Frame Header
+        t_header = p.addUserDebugText(
+            "🧠 [ BOB'S NEURAL BRAIN NETWORK - LIVE SYNAPSE GRAPH (PRESS 'N' TO CLOSE) ]",
             [anchor_x, anchor_y, anchor_z],
-            textColorRGB=[1.0, 0.9, 0.0], textSize=1.4, lifeTime=0
+            textColorRGB=[0.0, 0.95, 1.0], textSize=1.35, lifeTime=0
         )
-        self.nn_ui_ids.append(title_id)
+        self.nn_ui_ids.append(t_header)
         
-        if acts is not None:
-            inp = acts.get('input', np.zeros(16))
-            h1 = acts.get('h1', np.zeros(64))
-            h2 = acts.get('h2', np.zeros(64))
-            q_vals = acts.get('q_values', np.zeros(5))
+        if acts is None:
+            t_sb = p.addUserDebugText("STANDBY: Awaiting Neural Model Forward Pass...", [anchor_x, anchor_y, anchor_z - 0.4], textColorRGB=[0.8, 0.8, 0.8], textSize=1.2, lifeTime=0)
+            self.nn_ui_ids.append(t_sb)
+            return
+
+        inp = acts.get('input', np.zeros(16))
+        h1 = acts.get('h1', np.zeros(64))
+        h2 = acts.get('h2', np.zeros(64))
+        q_vals = acts.get('q_values', np.zeros(5))
+        best_act = np.argmax(q_vals)
+        
+        # 4 Network Graph Layers: Input (0), Hidden 1 (1), Hidden 2 (2), Output (3)
+        layer_x_offsets = [0.0, 1.4, 2.8, 4.2]
+        node_positions = {}
+        
+        # Layer 0: 8 Representative Inputs
+        input_labels = ["X-Pos", "Y-Pos", "Vel-X", "Vel-Y", "dx-Target", "dy-Target", "Grounded", "Time-Rem"]
+        node_positions[0] = []
+        z_start = anchor_z - 0.35
+        for i in range(8):
+            val = float(inp[i]) if i < len(inp) else 0.0
+            pos = [anchor_x + layer_x_offsets[0], anchor_y, z_start - (i * 0.18)]
+            node_positions[0].append((pos, abs(val), input_labels[i]))
             
-            # Input Layer (16 Neurons)
-            dx = inp[8] if len(inp) > 8 else 0.0
-            dy = inp[9] if len(inp) > 9 else 0.0
-            inp_str = f"INPUTS (16 Neurons) -> Target dx: {dx:+.2f} | dy: {dy:+.2f} | Ground: {int(inp[6])} | Time: {inp[7]:.2f}"
-            t1 = p.addUserDebugText(inp_str, [anchor_x, anchor_y, anchor_z - 0.28], textColorRGB=[0.0, 0.9, 1.0], textSize=1.2, lifeTime=0)
-            self.nn_ui_ids.append(t1)
+        # Layer 1: 8 Active Hidden Neurons (sampled from 64)
+        node_positions[1] = []
+        for i in range(8):
+            val = float(h1[i * 8]) if (i * 8) < len(h1) else 0.0
+            pos = [anchor_x + layer_x_offsets[1], anchor_y, z_start - (i * 0.18)]
+            node_positions[1].append((pos, val, f"H1-{i+1}"))
             
-            # Hidden Layer 1 (64 Neurons Activity Heatmap)
-            h1_act_count = np.sum(h1 > 0.1)
-            h1_bars = "".join(["█" if v > 0.2 else ("▄" if v > 0.05 else "░") for v in h1[:24]])
-            h1_str = f"HIDDEN L1 (64 Neurons) -> Active: {h1_act_count}/64 | Heat: [{h1_bars}]"
-            t2 = p.addUserDebugText(h1_str, [anchor_x, anchor_y, anchor_z - 0.52], textColorRGB=[0.2, 1.0, 0.4], textSize=1.1, lifeTime=0)
-            self.nn_ui_ids.append(t2)
+        # Layer 2: 8 Active Hidden Neurons (sampled from 64)
+        node_positions[2] = []
+        for i in range(8):
+            val = float(h2[i * 8]) if (i * 8) < len(h2) else 0.0
+            pos = [anchor_x + layer_x_offsets[2], anchor_y, z_start - (i * 0.18)]
+            node_positions[2].append((pos, val, f"H2-{i+1}"))
             
-            # Hidden Layer 2 (64 Neurons Activity Heatmap)
-            h2_act_count = np.sum(h2 > 0.1)
-            h2_bars = "".join(["█" if v > 0.2 else ("▄" if v > 0.05 else "░") for v in h2[:24]])
-            h2_str = f"HIDDEN L2 (64 Neurons) -> Active: {h2_act_count}/64 | Heat: [{h2_bars}]"
-            t3 = p.addUserDebugText(h2_str, [anchor_x, anchor_y, anchor_z - 0.74], textColorRGB=[0.2, 1.0, 0.4], textSize=1.1, lifeTime=0)
-            self.nn_ui_ids.append(t3)
+        # Layer 3: 5 Output Actions
+        action_names = ["0: BACK (-X)", "1: FWD (+X)", "2: LEFT (-Y)", "3: RIGHT (+Y)", "4: JUMP (+Z)"]
+        node_positions[3] = []
+        z_start_out = anchor_z - 0.45
+        for i in range(5):
+            val = float(q_vals[i])
+            pos = [anchor_x + layer_x_offsets[3], anchor_y, z_start_out - (i * 0.25)]
+            node_positions[3].append((pos, val, action_names[i]))
             
-            # Output Action Q-Values Stream (5 Neurons)
-            actions_name = ["0: BACK (-X)", "1: FWD (+X)", "2: LEFT (-Y)", "3: RIGHT (+Y)", "4: JUMP (+Z)"]
-            best_act = np.argmax(q_vals)
+        # DRAW LIVE SYNAPSE CONNECTION EDGES (p.addUserDebugLine) BETWEEN LAYERS!
+        for l_idx in range(3):
+            curr_nodes = node_positions[l_idx]
+            next_nodes = node_positions[l_idx + 1]
             
-            z_offset = anchor_z - 1.00
-            for a_idx in range(5):
-                q_v = q_vals[a_idx]
-                is_best = (a_idx == best_act)
-                prefix = "★ [WINNER]" if is_best else " "
-                col = [0.0, 1.0, 1.0] if is_best else [0.7, 0.7, 0.7]
-                size = 1.35 if is_best else 1.1
-                
-                act_line = f"{prefix} Q({actions_name[a_idx]}): {q_v:+.2f}"
-                t_act = p.addUserDebugText(act_line, [anchor_x, anchor_y, z_offset], textColorRGB=col, textSize=size, lifeTime=0)
-                self.nn_ui_ids.append(t_act)
-                z_offset -= 0.22
-        else:
-            t_standby = p.addUserDebugText("STANDBY: Awaiting Neural Model Forward Pass...", [anchor_x, anchor_y, anchor_z - 0.4], textColorRGB=[0.8, 0.8, 0.8], textSize=1.2, lifeTime=0)
-            self.nn_ui_ids.append(t_standby)
+            for n1_pos, n1_val, _ in curr_nodes[:4]:
+                for n2_pos, n2_val, _ in next_nodes[:4]:
+                    intensity = min(1.0, (n1_val + n2_val) * 0.5)
+                    if intensity > 0.05:
+                        col = [0.0, intensity, 1.0] if l_idx < 2 else [0.2, 1.0, 0.4]
+                        line_id = p.addUserDebugLine(n1_pos, n2_pos, lineColorRGB=col, lineWidth=1.5, lifeTime=0)
+                        self.nn_ui_ids.append(line_id)
+
+        # DRAW NEURON NODES & TEXT LABELS
+        for l_idx in range(4):
+            for i, (pos, val, label) in enumerate(node_positions[l_idx]):
+                if l_idx == 3: # Output layer
+                    is_winner = (i == best_act)
+                    color = [1.0, 0.9, 0.0] if is_winner else [0.6, 0.6, 0.6]
+                    prefix = "★ " if is_winner else "  "
+                    node_txt = f"{prefix}{label} -> Q: {val:+.2f}"
+                    size = 1.3 if is_winner else 1.0
+                    tid = p.addUserDebugText(node_txt, pos, textColorRGB=color, textSize=size, lifeTime=0)
+                    self.nn_ui_ids.append(tid)
+                else: # Hidden/Input layers
+                    heat_symbol = "●" if val > 0.2 else "○"
+                    color = [0.0, 1.0, 0.8] if val > 0.2 else [0.4, 0.4, 0.5]
+                    tid = p.addUserDebugText(f"{heat_symbol} {label}", pos, textColorRGB=color, textSize=1.0, lifeTime=0)
+                    self.nn_ui_ids.append(tid)
 
     def _update_ui(self):
         """Updates Real-Time Digital HUD Status Directly ON the Suspended Glass Board Screen."""
@@ -1055,29 +1084,32 @@ class BobsWorld3D(gym.Env):
         self._render_nn_visualizer()
         
         remaining = self.time_manager.get_remaining_time()
-        
-        if remaining > 10.0:
-            color = [0.2, 1.0, 0.5]
-        elif remaining > 5.0:
-            color = [1.0, 0.85, 0.1]
-        else:
-            color = [1.0, 0.2, 0.2]
-            
-        if self.ui_texts.get('status'):
-            try:
-                p.removeUserDebugItem(self.ui_texts['status'])
-            except:
-                pass
-                
         active_count = sum(1 for p_item in self.pressure_plates if p_item['activated'])
         total_count = len(self.pressure_plates)
         door_status_str = "DOOR OPEN" if self.door_open else ("OPENING..." if self.door_opening else ("DOOR LOCKED 🔒" if self.door_locked_bumped else "DOOR LOCKED"))
         
         ui_str = f"TIME: {remaining:.1f}s  |  PLATES: {active_count}/{total_count} GREEN  |  {door_status_str}"
-        self.ui_texts['status'] = p.addUserDebugText(
-            ui_str, [2.5, 2.60, 4.02],
-            textColorRGB=color, textSize=1.55, lifeTime=0
-        )
+        
+        # FLICKER-FREE SMOOTH TEXT UPDATE ON THE BLACK OBSIDIAN SCOREBOARD SCREEN
+        if not hasattr(self, 'last_ui_str') or self.last_ui_str != ui_str:
+            self.last_ui_str = ui_str
+            if remaining > 10.0:
+                color = [0.2, 1.0, 0.5]
+            elif remaining > 5.0:
+                color = [1.0, 0.85, 0.1]
+            else:
+                color = [1.0, 0.2, 0.2]
+                
+            if self.ui_texts.get('status'):
+                try:
+                    p.removeUserDebugItem(self.ui_texts['status'])
+                except:
+                    pass
+                    
+            self.ui_texts['status'] = p.addUserDebugText(
+                ui_str, [2.5, 2.60, 4.02],
+                textColorRGB=color, textSize=1.55, lifeTime=0
+            )
 
     def step(self, action):
         """Executes action across 5 3D Spatial Actions (-X, +X, -Y, +Y, +Z)."""
