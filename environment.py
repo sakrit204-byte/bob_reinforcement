@@ -88,6 +88,9 @@ class BobsWorld3D(gym.Env):
     def reset_environment_state(self):
         """Cleans up previous scene and spawns base elements."""
         p.resetSimulation()
+        if self.render_mode:
+            p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
+            p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)
         p.setGravity(0, 0, config.GRAVITY)
         p.setTimeStep(config.TIME_STEP)
 
@@ -163,7 +166,8 @@ class BobsWorld3D(gym.Env):
 
         # Camera positioning
         self.camera_manager.reset_camera_view(render_mode=self.render_mode)
-        self._update_camera(force=True)
+        if self.camera_manager.camera_mode != CameraMode.BLENDER_CONTROLS:
+            self._update_camera(force=True)
 
         observation = self._get_observation()
         info = {"level": self.current_level, "time_limit": config.LEVEL_TIME_LIMIT}
@@ -589,10 +593,6 @@ class BobsWorld3D(gym.Env):
 
         if changed and self.board_body_id is not None:
             try:
-                # Remove cached texture to avoid memory leak
-                if hasattr(self.board_screen_gen, 'cached_tex_id') and self.board_screen_gen.cached_tex_id is not None:
-                    p.changeVisualShape(self.board_body_id, -1, textureUniqueId=-1)
-                
                 tex_id = p.loadTexture(tex_path)
                 self.board_screen_gen.cached_tex_id = tex_id
                 p.changeVisualShape(self.board_body_id, -1, textureUniqueId=tex_id)
