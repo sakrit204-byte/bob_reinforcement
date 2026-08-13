@@ -648,7 +648,9 @@ class BobsWorld3D(gym.Env):
                 
             if not plate['activated']:
                 hx, hy = plate['half_extents'][0], plate['half_extents'][1]
-                if abs(bx - px) <= (hx + 0.25) and abs(by - py) <= (hy + 0.25) and (bz >= pz - 0.15):
+                dist_to_plate_2d = math.sqrt((bx - px)**2 + (by - py)**2)
+                # RELIABLE PROXIMITY ACTIVATION: Triggers when Bob is within 0.85m of plate center!
+                if dist_to_plate_2d <= 0.85 and (bz >= pz - 0.35):
                     plate['activated'] = True
                     p.changeVisualShape(
                         plate['id'], -1,
@@ -1061,7 +1063,7 @@ class BobsWorld3D(gym.Env):
             
         obs = self._get_observation()
         
-        # PLATE-FIRST DISTANCE PROGRESS REWARD
+        # POSITIVE ATTRACTION WELL REWARD (Guarantees Bob is drawn toward pressure plates without negative distance penalties!)
         unactive_plates = [p_item for p_item in self.pressure_plates if not p_item['activated']]
         if unactive_plates:
             unactive_plates.sort(key=lambda p_item: math.sqrt((bob_pos[0] - p_item['pos'][0])**2 + (bob_pos[1] - p_item['pos'][1])**2))
@@ -1073,15 +1075,17 @@ class BobsWorld3D(gym.Env):
         dist_progress = getattr(self, 'prev_target_dist', curr_target_dist) - curr_target_dist
         self.prev_target_dist = curr_target_dist
         
-        reward = dist_progress * 45.0
+        # Smooth Positive Attraction Reward + Progress Multiplier
+        attraction_reward = max(0.0, (1.0 - (curr_target_dist / 12.0))) * 1.5
+        reward = attraction_reward + max(-2.0, dist_progress * 35.0)
         
-        # Reward bonus for each activated pressure plate
+        # Reward mega-bonus for each activated pressure plate
         for i, plate in enumerate(self.pressure_plates):
             if plate['activated'] and i not in self.passed_obstacles:
-                reward += 80.0
+                reward += 100.0
                 self.passed_obstacles.add(i)
                 
-        # Strong penalty if Bob tries to rush locked exit door before all plates are green!
+        # Penalty if Bob tries to rush locked exit door before all plates are green
         if self.door_locked_bumped and not self.all_plates_activated:
             reward -= 15.0
             
