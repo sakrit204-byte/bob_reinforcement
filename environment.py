@@ -189,10 +189,10 @@ class BobsWorld3D(gym.Env):
             (current_pos[0] - self.last_bob_pos[0])**2 +
             (current_pos[1] - self.last_bob_pos[1])**2
         )
-        if dist_moved < 0.02:
+        if dist_moved < 0.008:
             self.stuck_counter += 1
         else:
-            self.stuck_counter = max(0, self.stuck_counter - 1)
+            self.stuck_counter = 0
         self.last_bob_pos = current_pos
         on_ground = self._check_on_ground()
 
