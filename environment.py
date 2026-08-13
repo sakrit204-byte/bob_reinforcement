@@ -635,9 +635,13 @@ class BobsWorld3D(gym.Env):
             
         if self.door_panel is not None and not self.door_open and not self.all_plates_activated:
             contacts = p.getContactPoints(bodyA=self.bob, bodyB=self.door_panel)
-            if len(contacts) > 0 and not self.door_locked_bumped:
-                self.door_locked_bumped = True
-                print("\n  🚪 [LOCKED DOOR BUMP DISCOVERY!]: Bob reached exit door, but door is LOCKED! Remaining plates required!")
+            if len(contacts) > 0 or bx >= 11.85:
+                if not self.door_locked_bumped:
+                    self.door_locked_bumped = True
+                    print("\n  🚪 [LOCKED DOOR BUMP DISCOVERY!]: Bob reached exit door, but door is LOCKED! Repelling Bob back to find plates!")
+                # INSTANT BACKWARD REPULSION BOUNCE: Propel Bob BACKWARDS (-X) away from the locked door!
+                p.resetBaseVelocity(self.bob, linearVelocity=[-4.5, random.uniform(-1.5, 1.5), 0.5])
+                p.applyExternalForce(self.bob, -1, [-35.0, 0.0, 5.0], [0, 0, 0], p.WORLD_FRAME)
                 
         for i, plate in enumerate(self.pressure_plates):
             px, py, pz = plate['pos']
@@ -1085,13 +1089,17 @@ class BobsWorld3D(gym.Env):
                 reward += 100.0
                 self.passed_obstacles.add(i)
                 
-        # HEAVY NEURAL REJECTION PENALTY: Reaching or bumping locked door before clearing all plates
+        # HEAVY NEURAL REJECTION & TURN-AROUND DIRECTIVE: Reaching or bumping locked door before clearing all plates
         if self.door_locked_bumped and not self.all_plates_activated:
-            reward -= 50.0  # Injects -50.0 penalty into PyTorch Q-target to heavily suppress premature door-rushing
+            reward -= 50.0  # Heavy penalty for hitting locked door
+            if action == 0:  # Action 0 = Moving Backward (-X) away from door
+                reward += 20.0  # Reward Bob for immediately turning around and heading back into the chamber!
+            elif action == 1: # Action 1 = Moving Forward (+X) into locked door
+                reward -= 100.0 # Heavy penalty for scrambling against the locked door!
             
         if not self.all_plates_activated and bob_pos[0] > 10.0:
             # Bob is hovering at the far end near the door while plates remain unactive!
-            reward -= 1.50  # Continuous penalty for hanging near the exit door without activating plates
+            reward -= 2.0  # Continuous penalty for hanging near the exit door without activating plates
             
         if self.stuck_counter > 40:
             reward -= 0.35
