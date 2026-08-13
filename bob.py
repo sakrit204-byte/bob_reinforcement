@@ -57,6 +57,10 @@ def run_session(mode="visual", level=1):
                 total_reward += reward
                 steps += 1
                 
+                # Real-time frame pacing for visual observation (prevents CPU uncapped fast-forward)
+                if mode != "headless":
+                    time.sleep(config.SUB_STEPS * config.TIME_STEP * 0.7)
+                
                 if done:
                     if mode != "demo":
                         agent.update_epsilon()
@@ -70,7 +74,8 @@ def run_session(mode="visual", level=1):
                         level = min(20, level + 1)
                         print(f"\n  🎉 [STAGE CLEARED!]: Bob completed Stage {old_lvl:02d}! Advancing curriculum to Stage {level:02d}!\n")
                         
-                    time.sleep(0.5)  # Brief pause between episodes for smooth visual transition
+                    # Comfortable pause between episodes so the user can observe the outcome and stats
+                    time.sleep(1.8)
                     break
                     
             if mode == "headless" and ep >= 100:
