@@ -16,6 +16,64 @@ from gymnasium import spaces
 import config
 from utils import TimeManager, CameraConfigManager
 
+import os
+from PIL import Image, ImageDraw, ImageFont
+
+class DigitalBoardScreen:
+    """Generates 3D Physical Display Screen Material Texture mapped directly onto the Obsidian Blackboard Mesh."""
+    def __init__(self, save_path="C:/Users/ACER/Desktop/24bce2954/bob_saves/board_screen.png"):
+        self.save_path = save_path
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        self.width = 1024
+        self.height = 256
+        self.last_hash = ""
+        
+    def generate(self, stage_num=1, remaining_time=18.0, active_plates=0, total_plates=1, door_status="DOOR LOCKED"):
+        state_hash = f"{stage_num}_{remaining_time:.1f}_{active_plates}_{total_plates}_{door_status}"
+        if state_hash == self.last_hash and os.path.exists(self.save_path):
+            return self.save_path
+            
+        self.last_hash = state_hash
+        img = Image.new("RGBA", (self.width, self.height), (8, 12, 20, 255))
+        draw = ImageDraw.Draw(img)
+        
+        # Outer Glowing LED Frame Borders
+        draw.rectangle([4, 4, self.width - 5, self.height - 5], outline=(0, 240, 255, 255), width=6)
+        draw.rectangle([10, 10, self.width - 11, self.height - 11], outline=(0, 180, 220, 180), width=2)
+        
+        try:
+            font_title = ImageFont.truetype("arialbd.ttf", 34)
+            font_large = ImageFont.truetype("arialbd.ttf", 36)
+            font_small = ImageFont.truetype("arial.ttf", 26)
+        except:
+            font_title = ImageFont.load_default()
+            font_large = ImageFont.load_default()
+            font_small = ImageFont.load_default()
+            
+        # Line 1: Facility Title
+        header_text = f"🧪 BOB'S EXPERIMENTAL FACILITY  |  STAGE {stage_num:02d}"
+        draw.text((25, 20), header_text, fill=(0, 240, 255, 255), font=font_title)
+        
+        # Divider Line
+        draw.line([25, 75, self.width - 25, 75], fill=(0, 240, 255, 120), width=2)
+        
+        # Line 2: Telemetry Metrics
+        time_color = (50, 255, 120, 255) if remaining_time > 10.0 else ((255, 200, 30, 255) if remaining_time > 5.0 else (255, 50, 50, 255))
+        draw.text((25, 95), f"TIME: {remaining_time:.1f}s", fill=time_color, font=font_large)
+        
+        plates_color = (50, 255, 120, 255) if active_plates == total_plates else (255, 220, 50, 255)
+        draw.text((340, 95), f"PLATES: {active_plates}/{total_plates} GREEN", fill=plates_color, font=font_large)
+        
+        door_color = (50, 255, 120, 255) if door_status == "DOOR OPEN" else (255, 60, 60, 255)
+        draw.text((720, 95), f"{door_status}", fill=door_color, font=font_large)
+        
+        # Line 3: Bottom Status Line
+        draw.line([25, 160, self.width - 25, 160], fill=(0, 240, 255, 120), width=2)
+        draw.text((25, 185), "🧠 BOB NEURAL MODEL: ACTIVE  |  PRESS 'N' KEY FOR LIVE SYNAPSE GRAPH", fill=(0, 220, 255, 255), font=font_small)
+        
+        img.save(self.save_path)
+        return self.save_path
+
 class CameraMode:
     BLENDER_CONTROLS = "Blender Controls (MMB Drag = Rotate | Left Click Drag = Pan | Scroll = Zoom)"
     FOLLOW = "Side-Profile Track View"
@@ -27,7 +85,7 @@ class BobsWorld3D(gym.Env):
     
     Cognitive & Sensory Rules:
     1. Bob receives relative direction vectors (dx, dy) to nearest unactivated pressure plate so Bob can learn navigation.
-    2. Integrated Digital Scoreboard HUD: Text cleanly mounted ON the suspended obsidian glass board screen.
+    2. Real 3D Physical Display Screen: Telemetry textures mapped directly onto the obsidian blackboard mesh surface.
     3. Elevated Platform with Front Glass Ledge Guardrail preventing viewer fall perception.
     4. 100% Visually Transparent Front Camera Wall with solid physical collision.
     """
@@ -931,31 +989,33 @@ class BobsWorld3D(gym.Env):
             )
 
     def _create_ui(self):
-        """Initializes 2026 Integrated Digital Scoreboard HUD directly ON the Suspended Glass Board Screen!"""
+        """Initializes 2026 Integrated Digital Scoreboard HUD directly ON the 3D Board Surface Mesh!"""
         if not self.render_mode:
             return
             
-        for t_id in self.ui_texts.values():
-            if t_id is not None:
-                try:
-                    p.removeUserDebugItem(t_id)
-                except:
-                    pass
-        self.ui_texts.clear()
-        
-        themes = getattr(config, 'ROOM_THEMES', {})
-        theme = themes.get(self.current_level, {'title': f"STAGE {self.current_level:02d}"})
-        title_text = theme.get('title', f"STAGE {self.current_level:02d}").upper()
-        
-        # Mounted 3D Text directly ON the Suspended Glass Digital Scoreboard Screen Surface
-        self.ui_texts['header'] = p.addUserDebugText(
-            f"[ 🧪 BOB'S TESTING FACILITY - {title_text} ]", [3.0, 2.60, 4.42],
-            textColorRGB=[0.0, 0.95, 1.0], textSize=1.75, lifeTime=0
+        if not hasattr(self, 'board_screen_gen'):
+            self.board_screen_gen = DigitalBoardScreen()
+            
+        tex_path = self.board_screen_gen.generate(
+            stage_num=self.current_level,
+            remaining_time=self.time_manager.get_remaining_time(),
+            active_plates=0,
+            total_plates=len(self.pressure_plates) if hasattr(self, 'pressure_plates') else 1,
+            door_status="DOOR LOCKED"
         )
-        self.ui_texts['status'] = p.addUserDebugText(
-            "TIME: 18.0s  |  PLATES: 0/1 GREEN  |  DOOR: LOCKED", [2.5, 2.60, 4.02],
-            textColorRGB=[0.2, 1.0, 0.5], textSize=1.55, lifeTime=0
+        tex_id = p.loadTexture(tex_path)
+        
+        # 2026 INTEGRATED DIGITAL SCOREBOARD OBSIDIAN GLASS PANEL (Mounted in Front of Back Wall at y = 2.65m)
+        self.board_body_id = p.createMultiBody(
+            baseMass=0,
+            baseVisualShapeIndex=p.createVisualShape(
+                p.GEOM_BOX, halfExtents=[4.8, 0.04, 0.52],
+                rgbaColor=[1.0, 1.0, 1.0, 1.0],
+                specularColor=[0.9, 0.9, 0.9]
+            ),
+            basePosition=[6.0, 2.65, 4.25]
         )
+        p.changeVisualShape(self.board_body_id, -1, textureUniqueId=tex_id)
 
     def attach_agent(self, agent):
         """Links agent to environment for Live Neural Network HUD Visualization."""
@@ -1074,7 +1134,7 @@ class BobsWorld3D(gym.Env):
                     self.nn_ui_ids.append(tid)
 
     def _update_ui(self):
-        """Updates Real-Time Digital HUD Status Directly ON the Suspended Glass Board Screen."""
+        """Updates Real 3D Physical Display Screen Material Texture Directly ON the Obsidian Blackboard Panel."""
         if not self.render_mode:
             return
             
@@ -1088,28 +1148,19 @@ class BobsWorld3D(gym.Env):
         total_count = len(self.pressure_plates)
         door_status_str = "DOOR OPEN" if self.door_open else ("OPENING..." if self.door_opening else ("DOOR LOCKED 🔒" if self.door_locked_bumped else "DOOR LOCKED"))
         
-        ui_str = f"TIME: {remaining:.1f}s  |  PLATES: {active_count}/{total_count} GREEN  |  {door_status_str}"
-        
-        # FLICKER-FREE SMOOTH TEXT UPDATE ON THE BLACK OBSIDIAN SCOREBOARD SCREEN
-        if not hasattr(self, 'last_ui_str') or self.last_ui_str != ui_str:
-            self.last_ui_str = ui_str
-            if remaining > 10.0:
-                color = [0.2, 1.0, 0.5]
-            elif remaining > 5.0:
-                color = [1.0, 0.85, 0.1]
-            else:
-                color = [1.0, 0.2, 0.2]
-                
-            if self.ui_texts.get('status'):
-                try:
-                    p.removeUserDebugItem(self.ui_texts['status'])
-                except:
-                    pass
-                    
-            self.ui_texts['status'] = p.addUserDebugText(
-                ui_str, [2.5, 2.60, 4.02],
-                textColorRGB=color, textSize=1.55, lifeTime=0
-            )
+        if not hasattr(self, 'board_screen_gen'):
+            self.board_screen_gen = DigitalBoardScreen()
+            
+        tex_path = self.board_screen_gen.generate(
+            stage_num=self.current_level,
+            remaining_time=remaining,
+            active_plates=active_count,
+            total_plates=total_count,
+            door_status=door_status_str
+        )
+        if getattr(self, 'board_body_id', None) is not None:
+            tex_id = p.loadTexture(tex_path)
+            p.changeVisualShape(self.board_body_id, -1, textureUniqueId=tex_id)
 
     def step(self, action):
         """Executes action across 5 3D Spatial Actions (-X, +X, -Y, +Y, +Z)."""
