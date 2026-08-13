@@ -57,8 +57,16 @@ def run_session(mode="visual", level=1):
                 if done:
                     if mode != "demo":
                         agent.update_epsilon()
-                    status_str = "PASSED SUCCESS!" if info.get('success') else f"FAILED ({info.get('failure_reason')})"
+                    is_success = info.get('success', False)
+                    status_str = "PASSED SUCCESS!" if is_success else f"FAILED ({info.get('failure_reason')})"
                     print(f"  [Episode {ep:03d}] Stage {level:02d} | {status_str} | Reward: {total_reward:.1f} | Steps: {steps} | Epsilon: {agent.epsilon:.3f}")
+                    
+                    # AUTOMATIC STAGE CURRICULUM PROGRESSION: Advance level on success!
+                    if is_success:
+                        old_lvl = level
+                        level = min(20, level + 1)
+                        print(f"\n  🎉 [STAGE CLEARED!]: Bob completed Stage {old_lvl:02d}! Advancing curriculum to Stage {level:02d}!\n")
+                        
                     time.sleep(0.5)  # Brief pause between episodes for smooth visual transition
                     break
                     
