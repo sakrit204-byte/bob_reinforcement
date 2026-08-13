@@ -19,11 +19,11 @@ TARGET_X_BASE = 11.8     # Exit Door location inside Right Wall
 
 # 3D MOVEMENT SPEED CONSTRAINTS
 BOB_MASS = 1.0
-RUN_SPEED = 2.2          # Forward X velocity (m/s) (Smooth walk)
-BACK_SPEED = -1.8        # Backward X velocity (m/s)
-LATERAL_SPEED = 1.8      # Left/Right Y velocity (m/s)
-JUMP_VELOCITY = 5.6      # Upward Z jump impulse (enough to clear obstacles)
-ACCEL_RATE = 0.5         # Ground movement responsiveness (balanced: smooth but responsive)
+RUN_SPEED = 3.2          # Forward X velocity (m/s) (Brisk, confident walk)
+BACK_SPEED = -2.4        # Backward X velocity (m/s)
+LATERAL_SPEED = 2.4      # Left/Right Y velocity (m/s)
+JUMP_VELOCITY = 6.2      # Upward Z jump impulse (clears pillars cleanly)
+ACCEL_RATE = 0.8         # Snappy, responsive ground control (no sluggish turtle drag)
 
 BOB_HALF_EXTENTS = [0.35, 0.3, 0.45]
 
@@ -85,7 +85,7 @@ BATCH_SIZE = 64      # Mini-batch size
 
 EPSILON_START = 1.0
 EPSILON_END = 0.05
-EPSILON_DECAY_EPISODES = 400
-TARGET_UPDATE_FREQ = 400
+EPSILON_DECAY_EPISODES = 120
+TARGET_UPDATE_FREQ = 200
 
 SAVE_DIR = "bob_saves"

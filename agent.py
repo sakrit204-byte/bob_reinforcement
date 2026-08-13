@@ -116,8 +116,16 @@ class DQNAgent:
         current_eps = 0.0 if eval_mode else self.epsilon
         
         if random.random() < current_eps:
-            act_idx = random.choice(allowed_actions)
+            # Persistent exploration: keep moving in current direction for 3-5 steps to cover ground cleanly
+            prev_act = self.last_actions[-1] if self.last_actions else None
+            if prev_act in allowed_actions and getattr(self, 'explore_repeat_count', 0) > 0 and random.random() < 0.75:
+                self.explore_repeat_count -= 1
+                act_idx = prev_act
+            else:
+                act_idx = random.choice(allowed_actions)
+                self.explore_repeat_count = random.randint(3, 6)
         else:
+            self.explore_repeat_count = 0
             # Exploitation: mask out forbidden actions
             for a in range(5):
                 if a not in allowed_actions:

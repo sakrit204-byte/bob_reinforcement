@@ -202,56 +202,57 @@ class BobsWorld3D(gym.Env):
             self.camera_manager.handle_mouse_events()
 
         # 5 3D SPATIAL ACTION EXECUTION LOOP (X, Y, Z)
-        for _ in range(config.SUB_STEPS):
+        if action == 4 and on_ground:
+            # Immediate high-power vertical jump impulse
+            curr_v, _ = p.getBaseVelocity(self.bob)
+            p.resetBaseVelocity(self.bob, linearVelocity=[config.RUN_SPEED * 0.7, curr_v[1] * 0.5, config.JUMP_VELOCITY])
+
+        for sub_step in range(config.SUB_STEPS):
             vel, _ = p.getBaseVelocity(self.bob)
             curr_vx, curr_vy, curr_vz = vel[0], vel[1], vel[2]
             
-            target_vx = 0.0
-            target_vy = 0.0
-            target_vz = curr_vz
+            target_vx = curr_vx
+            target_vy = curr_vy
             
             if action == 0:    # Backward (-X)
                 target_vx = config.BACK_SPEED
+                target_vy = 0.0
             elif action == 1:  # Forward (+X)
                 target_vx = config.RUN_SPEED
+                target_vy = 0.0
             elif action == 2:  # Left (-Y)
+                target_vx = 0.0
                 target_vy = -config.LATERAL_SPEED
             elif action == 3:  # Right (+Y)
+                target_vx = 0.0
                 target_vy = +config.LATERAL_SPEED
-            elif action == 4:  # Jump (+Z, Grounded Only!)
-                if on_ground:
-                    target_vz = config.JUMP_VELOCITY
-                    target_vx = config.RUN_SPEED * 0.6
-                    
-            if not on_ground and target_vz < 0.0:
-                target_vz += (config.GRAVITY * 0.4) * config.TIME_STEP
+            elif action == 4:  # Jump (+Z forward drive)
+                target_vx = config.RUN_SPEED * 0.75
                 
-            # Smoothly transition velocities using ACCEL_RATE (no instant snaps)
+            # Smooth horizontal transitions
             accel = config.ACCEL_RATE
             smooth_vx = curr_vx + (target_vx - curr_vx) * accel
             smooth_vy = curr_vy + (target_vy - curr_vy) * accel
             
-            # Reset velocity with smooth horizontal components and vertical impulse
-            p.resetBaseVelocity(self.bob, linearVelocity=[smooth_vx, smooth_vy, target_vz])
+            p.resetBaseVelocity(self.bob, linearVelocity=[smooth_vx, smooth_vy, curr_vz])
             
-            # Completely reset position bounds and lock orientation to [0, 0, 0, 1] on every sub-step!
+            # Clamp boundaries and lock upright orientation without wiping velocity
             pos, _ = p.getBasePositionAndOrientation(self.bob)
+            curr_lin_v, _ = p.getBaseVelocity(self.bob)
             bounded_x = max(0.45, min(11.75, pos[0]))
             bounded_y = max(-2.70, min(2.70, pos[1]))
             bounded_z = max(0.45, pos[2])
+            
             p.resetBasePositionAndOrientation(self.bob, [bounded_x, bounded_y, bounded_z], [0, 0, 0, 1])
+            p.resetBaseVelocity(self.bob, linearVelocity=curr_lin_v)
 
-            if self.stuck_counter > 100:
-                p.applyExternalForce(
-                    self.bob, -1,
-                    [random.uniform(-15, 25), random.uniform(-15, 15), random.uniform(10, 25)],
-                    [0, 0, 0], p.WORLD_FRAME
-                )
             p.stepSimulation()
 
         # Update attachments
+        bob_pos, _ = p.getBasePositionAndOrientation(self.bob)
+        self.last_bob_pos = bob_pos
         self._sync_bob_eyes()
-        self.camera_manager.update_camera(bob_pos=current_pos)
+        self.camera_manager.update_camera(bob_pos=bob_pos)
 
         # Update plate activation states and door animation
         bob_pos, _ = p.getBasePositionAndOrientation(self.bob)
@@ -454,12 +455,15 @@ class BobsWorld3D(gym.Env):
         return state
 
     def _check_on_ground(self):
-        """Checks if Bob is touching ground or platform surface."""
+        """Checks if Bob is touching ground or on a platform/obstacle surface."""
         if self.bob is None:
+            return True
+        pos, _ = p.getBasePositionAndOrientation(self.bob)
+        if pos[2] <= 0.65:
             return True
         contacts = p.getContactPoints(bodyA=self.bob)
         for c in contacts:
-            if c[7][2] > 0.4:
+            if abs(c[7][2]) > 0.4 or c[8] < 0.05:
                 return True
         return False
 
