@@ -9,7 +9,7 @@ and high-precision physics constants.
 # ============================================================================
 GRAVITY = -22.0         # Testing chamber room gravity
 TIME_STEP = 1.0 / 60.0  # 60 FPS physics rate
-SUB_STEPS = 2
+SUB_STEPS = 6           # Physics steps per agent action (10Hz decision rate for smooth movement)
 
 TOTAL_LEVELS = 20
 LEVEL_TIME_LIMIT = 18.0  # 18s time limit per 3D room puzzle

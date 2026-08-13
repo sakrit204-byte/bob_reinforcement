@@ -62,7 +62,7 @@ class DQNAgent:
         
         self.train_steps = 0
         self.last_actions = deque(maxlen=10)
-        self.tau = 0.01  # Polyak soft update parameter
+        self.tau = 0.005  # Polyak soft update parameter (Stabilizes target Q-value learning)
         self.latest_activations = {}
     
     def reset_agent_weights(self):

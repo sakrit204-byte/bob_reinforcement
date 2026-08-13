@@ -1279,9 +1279,9 @@ class BobsWorld3D(gym.Env):
         dist_progress = getattr(self, 'prev_target_dist', curr_target_dist) - curr_target_dist
         self.prev_target_dist = curr_target_dist
         
-        # Smooth Positive Attraction Reward + Progress Multiplier
+        # Smooth Positive Attraction Reward + Symmetric Progress (prevents back-and-forth oscillation exploitation)
         attraction_reward = max(0.0, (1.0 - (curr_target_dist / 12.0))) * 1.5
-        reward = attraction_reward + max(-2.0, dist_progress * 35.0)
+        reward = attraction_reward + (dist_progress * 30.0)
         
         # Reward mega-bonus for each activated pressure plate
         for i, plate in enumerate(self.pressure_plates):
