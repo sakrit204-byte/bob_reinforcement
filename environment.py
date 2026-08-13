@@ -88,6 +88,8 @@ class BobsWorld3D(gym.Env):
     def reset_environment_state(self):
         """Cleans up previous scene and spawns base elements."""
         p.resetSimulation()
+        # resetSimulation wipes ALL state — must re-apply search path, visualizer, physics
+        p.setAdditionalSearchPath(pybullet_data.getDataPath())
         if self.render_mode:
             p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
             p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)
@@ -124,6 +126,8 @@ class BobsWorld3D(gym.Env):
         self.last_bob_pos = [0.8, 0.0, 0.6]
         self.level_completed = False
         self.passed_obstacles = set()
+        self.on_ground = True
+        self.prev_target_dist = None  # Reset so first step doesn't get stale progress reward
 
         self.discovered_door = False
         self.door_locked_bumped = False
@@ -134,9 +138,6 @@ class BobsWorld3D(gym.Env):
         self.door_opening = False
         self.all_plates_activated = False
         self.door_z = 0.80
-
-        # Time Management
-        self.time_manager.start_level_timer()
 
         # Recreate static room assets & spawn targets
         self.reset_environment_state()
@@ -163,6 +164,9 @@ class BobsWorld3D(gym.Env):
 
         # Setup Visual UI Screen Blackboard
         self._create_ui()
+
+        # Start the level timer AFTER all construction is done (so building time doesn't eat into Bob's 18s)
+        self.time_manager.start_level_timer()
 
         # Camera positioning
         self.camera_manager.reset_camera_view(render_mode=self.render_mode)
@@ -263,7 +267,8 @@ class BobsWorld3D(gym.Env):
         else:
             curr_target_dist = math.sqrt((bob_pos[0] - self.target_x)**2 + (bob_pos[1] - self.target_y)**2)
             
-        dist_progress = getattr(self, 'prev_target_dist', curr_target_dist) - curr_target_dist
+        prev = self.prev_target_dist if self.prev_target_dist is not None else curr_target_dist
+        dist_progress = prev - curr_target_dist
         self.prev_target_dist = curr_target_dist
         
         # Smooth Positive Attraction Reward + Symmetric Progress (prevents back-and-forth oscillation exploitation)
