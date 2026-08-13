@@ -57,8 +57,7 @@ class NeuralNetworkHUD:
         inp = np.array(acts.get("input", np.zeros(16)), dtype=float) if acts else np.zeros(16)
         h1 = np.array(acts.get("h1", np.zeros(128)), dtype=float) if acts else np.zeros(128)
         h2 = np.array(acts.get("h2", np.zeros(128)), dtype=float) if acts else np.zeros(128)
-        q_vals = np.array(acts.get("q_values", np.zeros(5)), dtype=float) if acts else np.zeros(5)
-        best = int(np.argmax(q_vals))
+        best = int(acts.get("best_action", np.argmax(q_vals))) if acts else 0
 
         # Column X positions
         cx = [int(W * 0.10), int(W * 0.35), int(W * 0.60), int(W * 0.86)]

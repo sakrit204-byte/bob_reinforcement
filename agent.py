@@ -63,6 +63,7 @@ class DQNAgent:
         self.train_steps = 0
         self.last_actions = deque(maxlen=10)
         self.tau = 0.01  # Polyak soft update parameter
+        self.latest_activations = {}
     
     def reset_agent_weights(self):
         """Resets policy and target neural network weights to pure random initialization (Tabula Rasa)."""
@@ -108,6 +109,8 @@ class DQNAgent:
                 unstuck_actions = [0, 1, 2, 3]
             act_idx = random.choice(unstuck_actions)
             self.last_actions.append(act_idx)
+            if hasattr(self, 'latest_activations'):
+                self.latest_activations['best_action'] = act_idx
             return act_idx
         
         current_eps = 0.0 if eval_mode else self.epsilon
@@ -122,6 +125,8 @@ class DQNAgent:
             act_idx = torch.argmax(q_values).item()
         
         self.last_actions.append(act_idx)
+        if hasattr(self, 'latest_activations'):
+            self.latest_activations['best_action'] = act_idx
         return act_idx
     
     def remember(self, state, action, reward, next_state, done):
