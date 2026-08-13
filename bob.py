@@ -47,7 +47,7 @@ def run_session(mode="visual", level=1):
                 
                 if mode != "demo":
                     agent.memory.push(obs, action, reward, next_obs, done)
-                    agent.train_step()
+                    agent.replay()
                     
                 obs = next_obs
                 total_reward += reward
