@@ -20,18 +20,20 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 
 class DigitalBoardScreen:
-    """Generates 3D Physical Display Screen Material Texture mapped directly onto the Obsidian Blackboard Mesh."""
+    """Generates a real 3D texture image for the obsidian blackboard mesh surface."""
     def __init__(self, save_path="C:/Users/ACER/Desktop/24bce2954/bob_saves/board_screen.png"):
         self.save_path = save_path
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         self.width = 1024
         self.height = 256
         self.last_hash = ""
+        self.cached_tex_id = None  # Track loaded texture to avoid leaks
         
     def generate(self, stage_num=1, remaining_time=18.0, active_plates=0, total_plates=1, door_status="DOOR LOCKED"):
+        """Returns (save_path, changed) where changed is True if the image was regenerated."""
         state_hash = f"{stage_num}_{remaining_time:.1f}_{active_plates}_{total_plates}_{door_status}"
         if state_hash == self.last_hash and os.path.exists(self.save_path):
-            return self.save_path
+            return self.save_path, False
             
         self.last_hash = state_hash
         img = Image.new("RGBA", (self.width, self.height), (8, 12, 20, 255))
@@ -51,13 +53,13 @@ class DigitalBoardScreen:
             font_small = ImageFont.load_default()
             
         # Line 1: Facility Title
-        header_text = f"🧪 BOB'S EXPERIMENTAL FACILITY  |  STAGE {stage_num:02d}"
+        header_text = f"[*] BOB'S TESTING FACILITY  |  STAGE {stage_num:02d}"
         draw.text((25, 20), header_text, fill=(0, 240, 255, 255), font=font_title)
         
         # Divider Line
         draw.line([25, 75, self.width - 25, 75], fill=(0, 240, 255, 120), width=2)
         
-        # Line 2: Telemetry Metrics
+        # Line 2: Telemetry Metrics - Time, Plates, Door
         time_color = (50, 255, 120, 255) if remaining_time > 10.0 else ((255, 200, 30, 255) if remaining_time > 5.0 else (255, 50, 50, 255))
         draw.text((25, 95), f"TIME: {remaining_time:.1f}s", fill=time_color, font=font_large)
         
@@ -67,12 +69,12 @@ class DigitalBoardScreen:
         door_color = (50, 255, 120, 255) if door_status == "DOOR OPEN" else (255, 60, 60, 255)
         draw.text((720, 95), f"{door_status}", fill=door_color, font=font_large)
         
-        # Line 3: Bottom Status Line
+        # Line 3: Bottom Status Bar
         draw.line([25, 160, self.width - 25, 160], fill=(0, 240, 255, 120), width=2)
-        draw.text((25, 185), "🧠 BOB NEURAL MODEL: ACTIVE  |  PRESS 'N' KEY FOR LIVE SYNAPSE GRAPH", fill=(0, 220, 255, 255), font=font_small)
+        draw.text((25, 185), "NEURAL MODEL: ACTIVE  |  PRESS 'N' FOR LIVE NETWORK GRAPH", fill=(0, 220, 255, 255), font=font_small)
         
         img.save(self.save_path)
-        return self.save_path
+        return self.save_path, True
 
 class CameraMode:
     BLENDER_CONTROLS = "Blender Controls (MMB Drag = Rotate | Left Click Drag = Pan | Scroll = Zoom)"
@@ -369,17 +371,8 @@ class BobsWorld3D(gym.Env):
             basePosition=[12.1, 0, 2.2]
         )
         
-        # 2026 INTEGRATED DIGITAL SCOREBOARD OBSIDIAN GLASS PANEL (Mounted in Front of Back Wall at y = 2.65m)
-        p.createMultiBody(
-            baseMass=0,
-            baseVisualShapeIndex=p.createVisualShape(
-                p.GEOM_BOX, halfExtents=[4.8, 0.04, 0.52],
-                rgbaColor=config.COLORS['hud_bg'],
-                specularColor=[0.9, 0.9, 0.9]
-            ),
-            basePosition=[6.0, 2.65, 4.25]
-        )
-        # Neon Cyan LED Glass Board Frame Borders
+        # Board body and frame borders are created in _create_ui() which owns the textured display.
+        # Only the neon cyan LED frame trim is placed here (cosmetic, no texture needed).
         p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
@@ -989,14 +982,14 @@ class BobsWorld3D(gym.Env):
             )
 
     def _create_ui(self):
-        """Initializes 2026 Integrated Digital Scoreboard HUD directly ON the 3D Board Surface Mesh!"""
+        """Creates the single 3D board body and maps the initial texture onto it."""
         if not self.render_mode:
             return
             
         if not hasattr(self, 'board_screen_gen'):
             self.board_screen_gen = DigitalBoardScreen()
             
-        tex_path = self.board_screen_gen.generate(
+        tex_path, _ = self.board_screen_gen.generate(
             stage_num=self.current_level,
             remaining_time=self.time_manager.get_remaining_time(),
             active_plates=0,
@@ -1004,8 +997,9 @@ class BobsWorld3D(gym.Env):
             door_status="DOOR LOCKED"
         )
         tex_id = p.loadTexture(tex_path)
+        self.board_screen_gen.cached_tex_id = tex_id
         
-        # 2026 INTEGRATED DIGITAL SCOREBOARD OBSIDIAN GLASS PANEL (Mounted in Front of Back Wall at y = 2.65m)
+        # Single 3D board body — white base so the texture colors show true
         self.board_body_id = p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
@@ -1134,7 +1128,7 @@ class BobsWorld3D(gym.Env):
                     self.nn_ui_ids.append(tid)
 
     def _update_ui(self):
-        """Updates Real 3D Physical Display Screen Material Texture Directly ON the Obsidian Blackboard Panel."""
+        """Updates the 3D board texture only when displayed content actually changes."""
         if not self.render_mode:
             return
             
@@ -1146,20 +1140,22 @@ class BobsWorld3D(gym.Env):
         remaining = self.time_manager.get_remaining_time()
         active_count = sum(1 for p_item in self.pressure_plates if p_item['activated'])
         total_count = len(self.pressure_plates)
-        door_status_str = "DOOR OPEN" if self.door_open else ("OPENING..." if self.door_opening else ("DOOR LOCKED 🔒" if self.door_locked_bumped else "DOOR LOCKED"))
+        door_status_str = "DOOR OPEN" if self.door_open else ("OPENING..." if self.door_opening else ("LOCKED" if self.door_locked_bumped else "LOCKED"))
         
         if not hasattr(self, 'board_screen_gen'):
             self.board_screen_gen = DigitalBoardScreen()
             
-        tex_path = self.board_screen_gen.generate(
+        tex_path, changed = self.board_screen_gen.generate(
             stage_num=self.current_level,
             remaining_time=remaining,
             active_plates=active_count,
             total_plates=total_count,
             door_status=door_status_str
         )
-        if getattr(self, 'board_body_id', None) is not None:
+        # Only reload texture from disk when the image actually changed
+        if changed and getattr(self, 'board_body_id', None) is not None:
             tex_id = p.loadTexture(tex_path)
+            self.board_screen_gen.cached_tex_id = tex_id
             p.changeVisualShape(self.board_body_id, -1, textureUniqueId=tex_id)
 
     def step(self, action):
