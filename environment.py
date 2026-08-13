@@ -1114,16 +1114,31 @@ class BobsWorld3D(gym.Env):
             terminated = True
             self.record_end_of_level_camera(level=self.current_level)
             
+        active_count = sum(1 for p_item in self.pressure_plates if p_item['activated'])
+        total_count = len(self.pressure_plates)
+        
+        failure_detail = None
+        if not self.level_completed:
+            if bob_pos[2] < -0.8:
+                failure_detail = f"Fell Off Ledge (Plates: {active_count}/{total_count})"
+            elif self.stuck_counter > 280:
+                failure_detail = f"Stuck in Corner/Wall (Plates: {active_count}/{total_count})"
+            elif self.time_manager.is_time_up():
+                if active_count == 0:
+                    failure_detail = f"Timeout: Found 0/{total_count} plates"
+                elif active_count < total_count:
+                    failure_detail = f"Timeout: Got {active_count}/{total_count} plates (missing {total_count - active_count})"
+                else:
+                    failure_detail = f"Timeout: All {total_count}/{total_count} plates green, but couldn't reach door in time"
+                    
         info = {
             "success": self.level_completed,
             "level": self.current_level,
             "time_remaining": self.time_manager.get_remaining_time(),
             "on_ground": on_ground,
-            "failure_reason": (
-                "stuck" if self.stuck_counter > 280 else
-                "fall" if bob_pos[2] < -0.8 else
-                "timeout" if self.time_manager.is_time_up() else None
-            )
+            "active_plates": active_count,
+            "total_plates": total_count,
+            "failure_reason": failure_detail
         }
         
         return obs, reward, terminated, False, info
