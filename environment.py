@@ -1217,29 +1217,35 @@ class BobsWorld3D(gym.Env):
         # 5 3D SPATIAL ACTION EXECUTION LOOP (X, Y, Z)
         for _ in range(config.SUB_STEPS):
             vel, _ = p.getBaseVelocity(self.bob)
-            curr_vz = vel[2]
+            curr_vx, curr_vy, curr_vz = vel[0], vel[1], vel[2]
             
-            new_vx = 0.0
-            new_vy = 0.0
+            target_vx = 0.0
+            target_vy = 0.0
+            target_vz = curr_vz
             
             if action == 0:    # Backward (-X)
-                new_vx = config.BACK_SPEED
+                target_vx = config.BACK_SPEED
             elif action == 1:  # Forward (+X)
-                new_vx = config.RUN_SPEED
+                target_vx = config.RUN_SPEED
             elif action == 2:  # Left (-Y)
-                new_vy = -config.LATERAL_SPEED
+                target_vy = -config.LATERAL_SPEED
             elif action == 3:  # Right (+Y)
-                new_vy = +config.LATERAL_SPEED
+                target_vy = +config.LATERAL_SPEED
             elif action == 4:  # Jump (+Z, Grounded Only!)
                 if on_ground:
-                    curr_vz = config.JUMP_VELOCITY
-                    new_vx = config.RUN_SPEED * 0.7
+                    target_vz = config.JUMP_VELOCITY
+                    target_vx = config.RUN_SPEED * 0.6
                     
-            new_vz = curr_vz
-            if not on_ground and curr_vz < 0.0:
-                new_vz += (config.GRAVITY * 0.4) * config.TIME_STEP
+            if not on_ground and target_vz < 0.0:
+                target_vz += (config.GRAVITY * 0.4) * config.TIME_STEP
                 
-            p.resetBaseVelocity(self.bob, linearVelocity=[new_vx, new_vy, new_vz])
+            # Smoothly transition velocities using ACCEL_RATE (no instant movement snaps)
+            accel = config.ACCEL_RATE
+            smooth_vx = curr_vx + (target_vx - curr_vx) * accel
+            smooth_vy = curr_vy + (target_vy - curr_vy) * accel
+            
+            # Reset velocity with smooth horizontal components and vertical impulse
+            p.resetBaseVelocity(self.bob, linearVelocity=[smooth_vx, smooth_vy, target_vz])
             
             if self.stuck_counter > 100:
                 p.applyExternalForce(

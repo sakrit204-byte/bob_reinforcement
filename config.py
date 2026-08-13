@@ -19,11 +19,11 @@ TARGET_X_BASE = 11.8     # Exit Door location inside Right Wall
 
 # 3D MOVEMENT SPEED CONSTRAINTS
 BOB_MASS = 1.0
-RUN_SPEED = 3.5          # Forward X velocity (m/s)
-BACK_SPEED = -3.2        # Backward X velocity (m/s) (Fast escape from locked door!)
-LATERAL_SPEED = 3.0      # Left/Right Y velocity (m/s)
-JUMP_VELOCITY = 6.2      # Upward Z jump impulse (max jump height ~0.88m)
-ACCEL_RATE = 0.35        # Ground movement responsiveness
+RUN_SPEED = 1.6          # Forward X velocity (m/s) (Slow, controlled walk)
+BACK_SPEED = -1.4        # Backward X velocity (m/s)
+LATERAL_SPEED = 1.4      # Left/Right Y velocity (m/s)
+JUMP_VELOCITY = 5.6      # Upward Z jump impulse (enough to clear obstacles)
+ACCEL_RATE = 0.15        # Ground movement responsiveness (lower = smoother transition)
 
 BOB_HALF_EXTENTS = [0.35, 0.3, 0.45]
 
