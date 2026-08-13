@@ -36,8 +36,13 @@ def run_session(mode="visual", level=1):
             
             while True:
                 on_ground = env.on_ground
+                # Allow jumping only if there is an obstacle/wall close in front (obs[10] < 0.45)
+                # and only if there are still pressure plates left to activate.
+                forward_ray_fraction = obs[10]
+                can_jump = (forward_ray_fraction < 0.45) and (not env.all_plates_activated)
+                
                 eval_mode = (mode == "demo")
-                action = agent.act(obs, stuck=(env.stuck_counter > 40), on_ground=on_ground, eval_mode=eval_mode)
+                action = agent.act(obs, stuck=(env.stuck_counter > 40), on_ground=on_ground, can_jump=can_jump, eval_mode=eval_mode)
                 
                 try:
                     next_obs, reward, done, truncated, info = env.step(action)

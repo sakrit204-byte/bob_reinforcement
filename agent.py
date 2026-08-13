@@ -78,7 +78,7 @@ class DQNAgent:
         """Decay epsilon at the end of each episode."""
         self.epsilon = max(self.epsilon_min, self.epsilon - self.epsilon_decay)
     
-    def act(self, state, stuck=False, on_ground=True, eval_mode=False):
+    def act(self, state, stuck=False, on_ground=True, can_jump=True, eval_mode=False):
         """
         Select action using epsilon-greedy policy across 5 3D Spatial Actions.
         Captures live layer activations (h1, h2, Q-values) for HUD visualization.
@@ -96,20 +96,29 @@ class DQNAgent:
             }
         self.policy_net.train()
 
+        # Determine allowed actions
+        allowed_actions = [0, 1, 2, 3]
+        if on_ground and can_jump:
+            allowed_actions.append(4)
+
         if stuck:
-            act_idx = random.choice([0, 1, 2, 3, 4]) if on_ground else random.choice([0, 1, 2, 3])
+            # If stuck, choose random movement from allowed actions, avoiding jumping to get unstuck faster
+            unstuck_actions = [a for a in allowed_actions if a != 4]
+            if not unstuck_actions:
+                unstuck_actions = [0, 1, 2, 3]
+            act_idx = random.choice(unstuck_actions)
             self.last_actions.append(act_idx)
             return act_idx
         
         current_eps = 0.0 if eval_mode else self.epsilon
         
         if random.random() < current_eps:
-            # Exploration under strict grounded rule
-            act_idx = random.choice([0, 1, 2, 3, 4]) if on_ground else random.choice([0, 1, 2, 3])
+            act_idx = random.choice(allowed_actions)
         else:
-            # Exploitation
-            if not on_ground:
-                q_values[4] = -float('inf')
+            # Exploitation: mask out forbidden actions
+            for a in range(5):
+                if a not in allowed_actions:
+                    q_values[a] = -float('inf')
             act_idx = torch.argmax(q_values).item()
         
         self.last_actions.append(act_idx)

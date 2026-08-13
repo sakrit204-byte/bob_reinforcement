@@ -73,7 +73,7 @@ class DigitalBoardScreen:
         draw.line([25, 160, self.width - 25, 160], fill=(0, 240, 255, 120), width=2)
         draw.text((25, 185), "NEURAL MODEL: ACTIVE  |  PRESS 'N' FOR LIVE NETWORK GRAPH", fill=(0, 220, 255, 255), font=font_small)
         
-        img = img.transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_TOP_BOTTOM)
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
         img.save(self.save_path)
         return self.save_path, True
 
@@ -182,7 +182,7 @@ class NeuralNetworkScreen:
         # Bottom status
         draw.text((10, H - 22), f"WINNING ACTION: {action_names[best_act]}  |  Q: {q_vals[best_act]:+.2f}  |  PRESS 'N' TO HIDE", fill=(0, 220, 240), font=self.font_label)
 
-        img = img.transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_TOP_BOTTOM)
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
         img.save(self.save_path)
         return self.save_path, True
 
@@ -265,7 +265,7 @@ class BobsWorld3D(gym.Env):
         if self.render_mode:
             self.client = p.connect(p.GUI)
             p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
-            p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)
+            p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)
             p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
             p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 0)
             p.configureDebugVisualizer(p.COV_ENABLE_KEYBOARD_SHORTCUTS, 0)
@@ -488,20 +488,20 @@ class BobsWorld3D(gym.Env):
         p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
-                p.GEOM_BOX, halfExtents=[4.82, 0.05, 0.02],
+                p.GEOM_BOX, halfExtents=[3.22, 0.03, 0.015],
                 rgbaColor=config.COLORS['hud_frame'],
                 specularColor=[1.0, 1.0, 1.0]
             ),
-            basePosition=[6.0, 2.64, 4.77]
+            basePosition=[6.0, 2.84, 4.60]
         )
         p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
-                p.GEOM_BOX, halfExtents=[4.82, 0.05, 0.02],
+                p.GEOM_BOX, halfExtents=[3.22, 0.03, 0.015],
                 rgbaColor=config.COLORS['hud_frame'],
                 specularColor=[1.0, 1.0, 1.0]
             ),
-            basePosition=[6.0, 2.64, 3.73]
+            basePosition=[6.0, 2.84, 3.90]
         )
 
     def _create_bob(self):
@@ -525,12 +525,13 @@ class BobsWorld3D(gym.Env):
             self.bob, -1,
             mass=config.BOB_MASS,
             lateralFriction=0.1,
-            spinningFriction=0.01,
-            rollingFriction=0.01,
+            spinningFriction=0.0,
+            rollingFriction=0.0,
             linearDamping=0.0,
             angularDamping=1.0,
             restitution=0.0
         )
+        # We rely on the sub-step orientation reset to lock Bob's rotation instead.
         
         # 2026 NEON CYAN LED ENERGY BELT
         belt_vis = p.createVisualShape(
@@ -1115,11 +1116,11 @@ class BobsWorld3D(gym.Env):
         self.board_body_id = p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
-                p.GEOM_BOX, halfExtents=[4.8, 0.04, 0.52],
+                p.GEOM_BOX, halfExtents=[3.2, 0.02, 0.35],
                 rgbaColor=[1.0, 1.0, 1.0, 1.0],
                 specularColor=[0.9, 0.9, 0.9]
             ),
-            basePosition=[6.0, 2.65, 4.25]
+            basePosition=[6.0, 2.85, 4.25]
         )
         p.changeVisualShape(self.board_body_id, -1, textureUniqueId=tex_id)
 
@@ -1244,8 +1245,8 @@ class BobsWorld3D(gym.Env):
             
             pos, _ = p.getBasePositionAndOrientation(self.bob)
             bounded_y = max(-2.85, min(2.85, pos[1]))
-            if pos[1] != bounded_y:
-                p.resetBasePositionAndOrientation(self.bob, [pos[0], bounded_y, pos[2]], [0, 0, 0, 1])
+            # Completely reset position and lock orientation to [0, 0, 0, 1] on every simulation sub-step!
+            p.resetBasePositionAndOrientation(self.bob, [pos[0], bounded_y, pos[2]], [0, 0, 0, 1])
                 
         # DYNAMICALLY SYNC BOB'S GOOGLY EYES & LED BELT TO BOB'S MOVING CUBE BODY!
         self._sync_bob_eyes()
@@ -1281,11 +1282,24 @@ class BobsWorld3D(gym.Env):
                 reward += 100.0
                 self.passed_obstacles.add(i)
                 
-        # HEAVY NEURAL REJECTION & TURN-AROUND DIRECTIVE: Reaching or bumping locked door before clearing all plates
-        if self.door_locked_bumped and not self.all_plates_activated:
+        # Jump penalty
+        if action == 4:
+            reward -= 1.0
+                
+        # HEAVY NEURAL REJECTION & TURN-AROUND DIRECTIVE: Reaching or bumping locked door in the CURRENT step
+        is_touching_locked_door = False
+        if self.door_panel is not None and not self.door_open and not self.all_plates_activated:
+            contacts = p.getContactPoints(bodyA=self.bob, bodyB=self.door_panel)
+            if len(contacts) > 0 or bob_pos[0] >= 11.80:
+                is_touching_locked_door = True
+                if not self.door_locked_bumped:
+                    self.door_locked_bumped = True
+                    print("\n  🚪 [LOCKED DOOR BUMP DISCOVERY!]: Bob reached exit door, but door is LOCKED! Repelling Bob back to find plates!")
+                    
+        if is_touching_locked_door:
             reward -= 50.0  # Heavy penalty for hitting locked door
             if action == 0:  # Action 0 = Moving Backward (-X) away from door
-                reward += 20.0  # Reward Bob for immediately turning around and heading back into the chamber!
+                reward += 30.0  # Encourage Bob to move backward away from the locked door
             elif action == 1: # Action 1 = Moving Forward (+X) into locked door
                 reward -= 100.0 # Heavy penalty for scrambling against the locked door!
             
