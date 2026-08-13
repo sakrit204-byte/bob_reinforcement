@@ -1,6 +1,10 @@
 """
 UI Scoreboard HUD texture generators for Bob's World 3D.
 Uses PIL to draw real-time telemetry boards mapped onto PyBullet visual shapes.
+
+Two billboards:
+  1. Stats Board (back wall) - Stage, plates, neural model status
+  2. Door Status Board (right side wall near exit) - Red/Green dot + countdown timer
 """
 
 import os
@@ -8,60 +12,164 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 class DigitalBoardScreen:
-    """Generates a real 3D texture image for the obsidian blackboard mesh surface."""
+    """Generates the main stats billboard texture (back wall)."""
     def __init__(self, save_path="C:/Users/ACER/Desktop/24bce2954/bob_saves/board_screen.png"):
         self.save_path = save_path
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        self.width = 1024
+        self.width = 512
         self.height = 256
         self.last_hash = ""
-        self.cached_tex_id = None  # Track loaded texture to avoid leaks
-        
+        self.cached_tex_id = None
+
     def generate(self, stage_num=1, remaining_time=18.0, active_plates=0, total_plates=1, door_status="DOOR LOCKED"):
         """Returns (save_path, changed) where changed is True if the image was regenerated."""
         state_hash = f"{stage_num}_{remaining_time:.1f}_{active_plates}_{total_plates}_{door_status}"
         if state_hash == self.last_hash and os.path.exists(self.save_path):
             return self.save_path, False
-            
+
         self.last_hash = state_hash
-        img = Image.new("RGBA", (self.width, self.height), (8, 12, 20, 255))
+        W, H = self.width, self.height
+        img = Image.new("RGBA", (W, H), (8, 12, 20, 240))
         draw = ImageDraw.Draw(img)
-        
-        # Outer Glowing LED Frame Borders
-        draw.rectangle([4, 4, self.width - 5, self.height - 5], outline=(0, 240, 255, 255), width=6)
-        draw.rectangle([10, 10, self.width - 11, self.height - 11], outline=(0, 180, 220, 180), width=2)
-        
+
         try:
-            font_title = ImageFont.truetype("arialbd.ttf", 34)
-            font_large = ImageFont.truetype("arialbd.ttf", 36)
-            font_small = ImageFont.truetype("arial.ttf", 26)
-        except:
-            font_title = ImageFont.load_default()
-            font_large = ImageFont.load_default()
-            font_small = ImageFont.load_default()
-            
-        # Line 1: Facility Title
-        header_text = f"[*] BOB'S TESTING FACILITY  |  STAGE {stage_num:02d}"
-        draw.text((25, 20), header_text, fill=(0, 240, 255, 255), font=font_title)
-        
-        # Divider Line
-        draw.line([25, 75, self.width - 25, 75], fill=(0, 240, 255, 120), width=2)
-        
-        # Line 2: Telemetry Metrics - Time, Plates, Door
-        time_color = (50, 255, 120, 255) if remaining_time > 10.0 else ((255, 200, 30, 255) if remaining_time > 5.0 else (255, 50, 50, 255))
-        draw.text((25, 95), f"TIME: {remaining_time:.1f}s", fill=time_color, font=font_large)
-        
-        plates_color = (50, 255, 120, 255) if active_plates == total_plates else (255, 220, 50, 255)
-        draw.text((340, 95), f"PLATES: {active_plates}/{total_plates} GREEN", fill=plates_color, font=font_large)
-        
-        door_color = (50, 255, 120, 255) if door_status == "DOOR OPEN" else (255, 60, 60, 255)
-        draw.text((720, 95), f"{door_status}", fill=door_color, font=font_large)
-        
-        # Line 3: Bottom Status Bar
-        draw.line([25, 160, self.width - 25, 160], fill=(0, 240, 255, 120), width=2)
-        draw.text((25, 185), "NEURAL MODEL: ACTIVE  |  PRESS 'N' FOR LIVE NETWORK GRAPH", fill=(0, 220, 255, 255), font=font_small)
-        
-        # Horizontal flip for correct PyBullet box texture mapping (cancels out UV horizontal inversion)
+            font_header = ImageFont.truetype("arialbd.ttf", 22)
+            font_value = ImageFont.truetype("arialbd.ttf", 28)
+            font_label = ImageFont.truetype("arial.ttf", 16)
+        except Exception:
+            font_header = ImageFont.load_default()
+            font_value = font_header
+            font_label = font_header
+
+        # Outer cyan frame
+        draw.rectangle([2, 2, W - 3, H - 3], outline=(0, 200, 240, 255), width=3)
+        draw.rectangle([6, 6, W - 7, H - 7], outline=(0, 140, 180, 120), width=1)
+
+        # Header
+        draw.text((16, 12), f"BOB'S LAB  |  STAGE {stage_num:02d}", fill=(0, 235, 255), font=font_header)
+        draw.line([16, 42, W - 16, 42], fill=(0, 200, 240, 100), width=2)
+
+        # Row 1: Plates status
+        plates_color = (50, 255, 120) if active_plates == total_plates else (255, 200, 40)
+        draw.text((16, 54), "PLATES", fill=(120, 160, 180), font=font_label)
+        draw.text((16, 74), f"{active_plates} / {total_plates}", fill=plates_color, font=font_value)
+
+        # Row 1 right: Door status text
+        door_open = door_status == "DOOR OPEN"
+        door_color = (50, 255, 120) if door_open else (255, 60, 60)
+        draw.text((W // 2 + 10, 54), "EXIT DOOR", fill=(120, 160, 180), font=font_label)
+        draw.text((W // 2 + 10, 74), door_status, fill=door_color, font=font_value)
+
+        # Divider
+        draw.line([16, 115, W - 16, 115], fill=(0, 200, 240, 60), width=1)
+
+        # Row 2: Time
+        time_color = (50, 255, 120) if remaining_time > 10.0 else ((255, 200, 30) if remaining_time > 5.0 else (255, 50, 50))
+        draw.text((16, 124), "TIME REMAINING", fill=(120, 160, 180), font=font_label)
+        draw.text((16, 144), f"{remaining_time:.1f}s", fill=time_color, font=font_value)
+
+        # Row 2 right: Neural model
+        draw.text((W // 2 + 10, 124), "NEURAL MODEL", fill=(120, 160, 180), font=font_label)
+        draw.text((W // 2 + 10, 144), "ACTIVE", fill=(0, 220, 240), font=font_value)
+
+        # Bottom bar
+        draw.line([16, 190, W - 16, 190], fill=(0, 200, 240, 60), width=1)
+        draw.text((16, 200), "PRESS 'N' FOR LIVE NETWORK GRAPH", fill=(0, 180, 210, 180), font=font_label)
+
+        # Progress bar for plates
+        bar_x = 16
+        bar_y = 225
+        bar_w = W - 32
+        bar_h = 16
+        draw.rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], outline=(0, 140, 180, 120), width=1)
+        if total_plates > 0:
+            fill_w = int(bar_w * active_plates / total_plates)
+            if fill_w > 0:
+                draw.rectangle([bar_x + 1, bar_y + 1, bar_x + fill_w, bar_y + bar_h - 1],
+                               fill=(50, 255, 120, 200))
+
+        # Flip for PyBullet UV mapping
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        img.save(self.save_path)
+        return self.save_path, True
+
+
+class DoorStatusScreen:
+    """Generates the door status indicator billboard texture (near exit wall).
+    Shows a large red/green dot and countdown timer only."""
+    def __init__(self, save_path="C:/Users/ACER/Desktop/24bce2954/bob_saves/door_status.png"):
+        self.save_path = save_path
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        self.width = 256
+        self.height = 256
+        self.last_hash = ""
+        self.cached_tex_id = None
+
+    def generate(self, door_open=False, remaining_time=18.0):
+        """Returns (save_path, changed)."""
+        state_hash = f"{'O' if door_open else 'C'}_{remaining_time:.1f}"
+        if state_hash == self.last_hash and os.path.exists(self.save_path):
+            return self.save_path, False
+
+        self.last_hash = state_hash
+        W, H = self.width, self.height
+        img = Image.new("RGBA", (W, H), (8, 12, 20, 220))
+        draw = ImageDraw.Draw(img)
+
+        try:
+            font_time = ImageFont.truetype("arialbd.ttf", 36)
+            font_label = ImageFont.truetype("arial.ttf", 16)
+        except Exception:
+            font_time = ImageFont.load_default()
+            font_label = font_time
+
+        # Frame
+        draw.rectangle([2, 2, W - 3, H - 3], outline=(0, 200, 240, 200), width=2)
+
+        # --- Large status dot ---
+        dot_cx, dot_cy = W // 2, 75
+        dot_r = 42
+        # Outer glow ring
+        glow_color = (40, 255, 100, 80) if door_open else (255, 50, 50, 80)
+        draw.ellipse([dot_cx - dot_r - 8, dot_cy - dot_r - 8,
+                       dot_cx + dot_r + 8, dot_cy + dot_r + 8],
+                      fill=glow_color)
+        # Main dot
+        dot_fill = (40, 255, 100) if door_open else (255, 40, 40)
+        dot_outline = (80, 255, 160) if door_open else (255, 100, 100)
+        draw.ellipse([dot_cx - dot_r, dot_cy - dot_r,
+                       dot_cx + dot_r, dot_cy + dot_r],
+                      fill=dot_fill, outline=dot_outline, width=3)
+        # Inner bright core
+        core_r = 18
+        core_fill = (180, 255, 220) if door_open else (255, 180, 180)
+        draw.ellipse([dot_cx - core_r, dot_cy - core_r,
+                       dot_cx + core_r, dot_cy + core_r],
+                      fill=core_fill)
+
+        # Label under dot
+        status_text = "OPEN" if door_open else "LOCKED"
+        status_color = (40, 255, 100) if door_open else (255, 60, 60)
+        bbox = draw.textbbox((0, 0), status_text, font=font_label)
+        tw = bbox[2] - bbox[0]
+        draw.text(((W - tw) // 2, dot_cy + dot_r + 12), status_text, fill=status_color, font=font_label)
+
+        # Divider
+        draw.line([20, 155, W - 20, 155], fill=(0, 200, 240, 80), width=1)
+
+        # --- Timer ---
+        time_color = (50, 255, 120) if remaining_time > 10.0 else ((255, 200, 30) if remaining_time > 5.0 else (255, 50, 50))
+        time_str = f"{remaining_time:.1f}"
+        bbox = draw.textbbox((0, 0), time_str, font=font_time)
+        tw = bbox[2] - bbox[0]
+        draw.text(((W - tw) // 2, 168), time_str, fill=time_color, font=font_time)
+
+        # "SECONDS" label
+        bbox = draw.textbbox((0, 0), "SECONDS", font=font_label)
+        tw = bbox[2] - bbox[0]
+        draw.text(((W - tw) // 2, 212), "SECONDS", fill=(120, 160, 180), font=font_label)
+
+        # Flip for PyBullet UV mapping
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
         img.save(self.save_path)
         return self.save_path, True
@@ -75,12 +183,12 @@ class NeuralNetworkScreen:
         self.width = 640
         self.height = 400
         self.last_hash = ""
-        
+
         try:
             self.font_title = ImageFont.truetype("arialbd.ttf", 16)
             self.font_label = ImageFont.truetype("arial.ttf", 11)
             self.font_val = ImageFont.truetype("arialbd.ttf", 13)
-        except:
+        except Exception:
             self.font_title = ImageFont.load_default()
             self.font_label = ImageFont.load_default()
             self.font_val = ImageFont.load_default()

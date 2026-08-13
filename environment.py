@@ -15,7 +15,7 @@ import config
 from utils import TimeManager
 import assets
 from camera import CameraManager, CameraMode
-from ui import DigitalBoardScreen
+from ui import DigitalBoardScreen, DoorStatusScreen
 
 
 class BobsWorld3D(gym.Env):
@@ -49,9 +49,11 @@ class BobsWorld3D(gym.Env):
         self.obstacles = []
         self.pressure_plates = []
 
-        # HUD UI Generator
+        # HUD UI Generators
         self.board_screen_gen = None
         self.board_body_id = None
+        self.door_screen_gen = None
+        self.door_board_id = None
         self.show_nn_visualizer = False
         self._nn_hud = None
 
@@ -550,13 +552,14 @@ class BobsWorld3D(gym.Env):
         self.camera_manager.update_camera(force=force, bob_pos=bob_pos)
 
     def _create_ui(self):
-        """Creates the 3D scoreboard blackboard object in room."""
+        """Creates both 3D billboard objects in the room."""
         if not self.render_mode:
             return
-            
+
+        # --- Billboard 1: Main Stats Board (back wall, centered) ---
         if self.board_screen_gen is None:
             self.board_screen_gen = DigitalBoardScreen()
-            
+
         tex_path, _ = self.board_screen_gen.generate(
             stage_num=self.current_level,
             remaining_time=self.time_manager.get_remaining_time(),
@@ -566,43 +569,82 @@ class BobsWorld3D(gym.Env):
         )
         tex_id = p.loadTexture(tex_path)
         self.board_screen_gen.cached_tex_id = tex_id
-        
+
+        # 2:1 aspect ratio panel (2.4m wide x 1.2m tall), mounted on back wall at eye level
         self.board_body_id = p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
-                p.GEOM_BOX, halfExtents=[3.2, 0.02, 0.35],
+                p.GEOM_BOX, halfExtents=[2.4, 0.02, 1.2],
                 rgbaColor=[1.0, 1.0, 1.0, 1.0],
-                specularColor=[0.9, 0.9, 0.9]
+                specularColor=[0.4, 0.4, 0.4]
             ),
-            basePosition=[6.0, 2.85, 4.25]
+            basePosition=[6.0, 2.92, 2.5]
         )
         p.changeVisualShape(self.board_body_id, -1, textureUniqueId=tex_id)
 
+        # --- Billboard 2: Door Status Indicator (right wall, near exit) ---
+        if self.door_screen_gen is None:
+            self.door_screen_gen = DoorStatusScreen()
+
+        door_tex_path, _ = self.door_screen_gen.generate(
+            door_open=False,
+            remaining_time=self.time_manager.get_remaining_time()
+        )
+        door_tex_id = p.loadTexture(door_tex_path)
+        self.door_screen_gen.cached_tex_id = door_tex_id
+
+        # 1:1 square panel (0.9m x 0.9m), mounted on right wall above door
+        self.door_board_id = p.createMultiBody(
+            baseMass=0,
+            baseVisualShapeIndex=p.createVisualShape(
+                p.GEOM_BOX, halfExtents=[0.02, 0.9, 0.9],
+                rgbaColor=[1.0, 1.0, 1.0, 1.0],
+                specularColor=[0.4, 0.4, 0.4]
+            ),
+            basePosition=[11.92, self.target_y, 2.6]
+        )
+        p.changeVisualShape(self.door_board_id, -1, textureUniqueId=door_tex_id)
+
     def _update_ui(self):
-        """Redraws scoreboard UI screen if data has changed."""
-        if not self.render_mode or self.board_screen_gen is None:
+        """Redraws both billboard textures if data has changed."""
+        if not self.render_mode:
             return
-            
+
         time_rem = self.time_manager.get_remaining_time()
         active_plates = sum(1 for p_item in self.pressure_plates if p_item['activated'])
         total_plates = len(self.pressure_plates)
         door_status = "DOOR OPEN" if self.door_open else ("OPENING..." if self.door_opening else "DOOR LOCKED")
 
-        tex_path, changed = self.board_screen_gen.generate(
-            stage_num=self.current_level,
-            remaining_time=time_rem,
-            active_plates=active_plates,
-            total_plates=total_plates,
-            door_status=door_status
-        )
+        # --- Update Billboard 1: Main Stats ---
+        if self.board_screen_gen is not None:
+            tex_path, changed = self.board_screen_gen.generate(
+                stage_num=self.current_level,
+                remaining_time=time_rem,
+                active_plates=active_plates,
+                total_plates=total_plates,
+                door_status=door_status
+            )
+            if changed and self.board_body_id is not None:
+                try:
+                    tex_id = p.loadTexture(tex_path)
+                    self.board_screen_gen.cached_tex_id = tex_id
+                    p.changeVisualShape(self.board_body_id, -1, textureUniqueId=tex_id)
+                except Exception as e:
+                    print(f"Stats Board Warning: {e}")
 
-        if changed and self.board_body_id is not None:
-            try:
-                tex_id = p.loadTexture(tex_path)
-                self.board_screen_gen.cached_tex_id = tex_id
-                p.changeVisualShape(self.board_body_id, -1, textureUniqueId=tex_id)
-            except Exception as e:
-                print(f"UI Update Warning: {e}")
+        # --- Update Billboard 2: Door Status ---
+        if self.door_screen_gen is not None:
+            door_tex_path, door_changed = self.door_screen_gen.generate(
+                door_open=self.door_open,
+                remaining_time=time_rem
+            )
+            if door_changed and self.door_board_id is not None:
+                try:
+                    door_tex_id = p.loadTexture(door_tex_path)
+                    self.door_screen_gen.cached_tex_id = door_tex_id
+                    p.changeVisualShape(self.door_board_id, -1, textureUniqueId=door_tex_id)
+                except Exception as e:
+                    print(f"Door Board Warning: {e}")
 
         # Render 2D Tkinter HUD neural network window if show is toggled
         self._render_nn_visualizer()
