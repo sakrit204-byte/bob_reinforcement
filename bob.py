@@ -47,15 +47,13 @@ def run_session(mode="visual", level=1):
                 
                 if mode != "demo":
                     agent.memory.push(obs, action, reward, next_obs, done)
-                    agent.replay()
+                    if steps % 4 == 0:
+                        agent.replay()
                     
                 obs = next_obs
                 total_reward += reward
                 steps += 1
                 
-                if render:
-                    time.sleep(0.016)
-                    
                 if done:
                     if mode != "demo":
                         agent.update_epsilon()

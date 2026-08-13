@@ -93,7 +93,7 @@ class BobsWorld3D(gym.Env):
         if self.render_mode:
             self.client = p.connect(p.GUI)
             p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
-            p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)
+            p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)
             p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
             p.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 0)
             p.configureDebugVisualizer(p.COV_ENABLE_KEYBOARD_SHORTCUTS, 0)
