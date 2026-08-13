@@ -1128,56 +1128,24 @@ class BobsWorld3D(gym.Env):
         self.agent = agent
 
     def _render_nn_visualizer(self):
-        """Renders neural network as a 3D textured panel (like the billboard). No debug text/lines."""
+        """Spawns or closes the 2D Neural Network HUD window when 'N' is toggled."""
         if not self.render_mode:
             return
 
         show = getattr(self, 'show_nn_visualizer', False)
 
-        # Hide the panel when toggled off
-        if not show:
-            if getattr(self, 'nn_panel_id', None) is not None:
-                p.removeBody(self.nn_panel_id)
-                self.nn_panel_id = None
-            return
-
-        # Throttle: only update every 10 frames
-        if not hasattr(self, '_nn_frame_counter'):
-            self._nn_frame_counter = 0
-        self._nn_frame_counter += 1
-        if self._nn_frame_counter % 10 != 1 and getattr(self, 'nn_panel_id', None) is not None:
-            return
-
-        acts = getattr(self.agent, 'latest_activations', None) if getattr(self, 'agent', None) else None
-        inp = acts.get('input', np.zeros(16)) if acts else np.zeros(16)
-        h1 = acts.get('h1', np.zeros(64)) if acts else np.zeros(64)
-        h2 = acts.get('h2', np.zeros(64)) if acts else np.zeros(64)
-        q_vals = acts.get('q_values', np.zeros(5)) if acts else np.zeros(5)
-        best_act = int(np.argmax(q_vals))
-
-        # Generate PIL texture image
-        if not hasattr(self, '_nn_screen_gen'):
-            self._nn_screen_gen = NeuralNetworkScreen()
-
-        tex_path, changed = self._nn_screen_gen.generate(inp, h1, h2, q_vals, best_act)
-
-        if changed or getattr(self, 'nn_panel_id', None) is None:
-            tex_id = p.loadTexture(tex_path)
-
-            # Remove old panel body and create fresh one with new texture
-            if getattr(self, 'nn_panel_id', None) is not None:
-                p.removeBody(self.nn_panel_id)
-
-            self.nn_panel_id = p.createMultiBody(
-                baseMass=0,
-                baseVisualShapeIndex=p.createVisualShape(
-                    p.GEOM_BOX, halfExtents=[3.2, 0.03, 2.0],
-                    rgbaColor=[1.0, 1.0, 1.0, 1.0],
-                    specularColor=[0.6, 0.6, 0.6]
-                ),
-                basePosition=[6.0, -2.90, 2.5]
-            )
-            p.changeVisualShape(self.nn_panel_id, -1, textureUniqueId=tex_id)
+        if show:
+            # Open the 2D HUD window if not already open
+            hud = getattr(self, '_nn_hud', None)
+            if hud is None or not hud.alive:
+                from visualizer import NeuralNetworkHUD
+                self._nn_hud = NeuralNetworkHUD(agent_ref=self.agent)
+        else:
+            # Close if open
+            hud = getattr(self, '_nn_hud', None)
+            if hud is not None and hud.alive:
+                hud.close()
+                self._nn_hud = None
 
     def _update_ui(self):
         """Updates the 3D board texture and NN panel only when content changes."""

@@ -1,154 +1,152 @@
 """
-Interactive 2D Neural Network Visualizer Window for Bob's World RL Agent.
-Can be moved anywhere on screen, resized, and interacted with in real-time alongside the 3D PyBullet Environment.
-Renders real-time neuron nodes, synapse connection lines, and action Q-value charts.
+2D Neural Network HUD Window for Bob's RL Agent.
+Spawns as a separate always-on-top Tkinter window alongside the 3D PyBullet environment.
+Renders live neuron nodes, synapse lines, and Q-value bars on a Canvas at 20 FPS.
 """
 
+import threading
 import tkinter as tk
-import math
 import numpy as np
 
-class InteractiveNeuralVisualizer:
-    """
-    Dedicated 2D Window Overlay that renders live PyTorch neuron activations,
-    synapse connections, and action Q-values.
-    """
-    def __init__(self, master=None, agent=None):
-        if master is None:
-            self.root = tk.Tk()
-            self.is_toplevel = False
-        else:
-            self.root = tk.Toplevel(master)
-            self.is_toplevel = True
-            
-        self.root.title("🧠 Bob's Neural Brain Visualizer (Live PyTorch Model)")
-        self.root.geometry("850x520+50+50")
-        self.root.configure(bg="#0c1017")
-        self.agent = agent
-        self.running = True
-        
-        # Title Bar
-        header = tk.Frame(self.root, bg="#161d2a", padx=10, pady=8)
-        header.pack(fill='x')
-        lbl_title = tk.Label(header, text="🧠 BOB'S DEDICATED LIVE NEURAL NETWORK VISUALIZER", bg="#161d2a", fg="#00f0ff", font=('Segoe UI', 12, 'bold'))
-        lbl_title.pack(side='left')
-        lbl_info = tk.Label(header, text="Drag window to reposition | Live PyTorch Activations", bg="#161d2a", fg="#94a3b8", font=('Segoe UI', 9))
-        lbl_info.pack(side='right')
-        
-        # Interactive Canvas
-        self.canvas = tk.Canvas(self.root, bg="#090d14", highlightthickness=0)
-        self.canvas.pack(fill='both', expand=True, padx=10, pady=10)
-        
-        # Protocol on close
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-        
-        # Initial draw loop
-        self.draw_network()
-        
-    def on_close(self):
-        self.running = False
+
+class NeuralNetworkHUD:
+    """Lightweight 2D HUD window that renders the live neural network graph."""
+
+    def __init__(self, agent_ref):
+        self.agent = agent_ref
+        self.alive = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self):
+        self.root = tk.Tk()
+        self.root.title("Bob's Neural Network  |  Live Activations")
+        self.root.geometry("680x440+30+30")
+        self.root.configure(bg="#080c14")
+        self.root.attributes("-topmost", True)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        self.canvas = tk.Canvas(self.root, bg="#080c14", highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
+
+        self._draw()
+        self.root.mainloop()
+
+    def _on_close(self):
+        self.alive = False
         self.root.destroy()
-        
-    def draw_network(self):
-        if not self.running:
+
+    def _draw(self):
+        if not self.alive:
             return
-            
+
+        c = self.canvas
+        c.delete("all")
+        W = c.winfo_width() or 660
+        H = c.winfo_height() or 420
+
+        # Border
+        c.create_rectangle(2, 2, W - 2, H - 2, outline="#00c8dc", width=2)
+
+        # Title
+        c.create_text(W // 2, 18, text="NEURAL NETWORK  |  LIVE ACTIVATIONS",
+                       fill="#00e6ff", font=("Segoe UI", 12, "bold"))
+
+        # Get activations
+        acts = getattr(self.agent, "latest_activations", None) if self.agent else None
+        inp = np.array(acts.get("input", np.zeros(16)), dtype=float) if acts else np.zeros(16)
+        h1 = np.array(acts.get("h1", np.zeros(128)), dtype=float) if acts else np.zeros(128)
+        h2 = np.array(acts.get("h2", np.zeros(128)), dtype=float) if acts else np.zeros(128)
+        q_vals = np.array(acts.get("q_values", np.zeros(5)), dtype=float) if acts else np.zeros(5)
+        best = int(np.argmax(q_vals))
+
+        # Column X positions
+        cx = [int(W * 0.10), int(W * 0.35), int(W * 0.60), int(W * 0.86)]
+
+        # Layer headers
+        headers = ["INPUT (16)", "HIDDEN L1 (128)", "HIDDEN L2 (128)", "OUTPUT (5)"]
+        for i, h in enumerate(headers):
+            c.create_text(cx[i], 42, text=h, fill="#5a9ab5", font=("Segoe UI", 8))
+
+        # Build node lists  [  (x, y, value, label)  ]
+        in_labels = ["X", "Y", "VelX", "VelY", "dx", "dy", "Gnd", "Time"]
+        act_labels = ["BACK", "FWD", "LEFT", "RIGHT", "JUMP"]
+        nodes = [[], [], [], []]
+
+        for i in range(8):
+            y = 68 + i * 40
+            v = abs(float(inp[i])) if i < len(inp) else 0.0
+            nodes[0].append((cx[0], y, v, in_labels[i]))
+
+        for i in range(8):
+            y = 68 + i * 40
+            v = float(h1[i * 16]) if (i * 16) < len(h1) else 0.0
+            nodes[1].append((cx[1], y, v, ""))
+
+        for i in range(8):
+            y = 68 + i * 40
+            v = float(h2[i * 16]) if (i * 16) < len(h2) else 0.0
+            nodes[2].append((cx[2], y, v, ""))
+
+        for i in range(5):
+            y = 100 + i * 60
+            v = float(q_vals[i])
+            nodes[3].append((cx[3], y, v, act_labels[i]))
+
+        # Synapse lines
+        for layer in range(3):
+            for (x1, y1, v1, _) in nodes[layer]:
+                for (x2, y2, v2, _) in nodes[layer + 1]:
+                    intensity = min(1.0, max(0.0, (abs(v1) + abs(v2)) * 0.35))
+                    if intensity < 0.04:
+                        continue
+                    g = int(intensity * 160)
+                    b = int(100 + intensity * 155)
+                    color = f"#{int(intensity*30):02x}{g:02x}{b:02x}"
+                    c.create_line(x1, y1, x2, y2, fill=color, width=1)
+
+        # Nodes
+        R = 11
+        for layer in range(4):
+            for i, (nx, ny, nv, nl) in enumerate(nodes[layer]):
+                if layer == 3:
+                    is_best = (i == best)
+                    fill = "#0ac86a" if is_best else "#1e2838"
+                    outline = "#00ffb4" if is_best else "#4a5568"
+                    c.create_oval(nx - R, ny - R, nx + R, ny + R,
+                                  fill=fill, outline=outline, width=3 if is_best else 1)
+                    tc = "#ffffff" if is_best else "#8899aa"
+                    prefix = ">> " if is_best else ""
+                    c.create_text(nx + R + 6, ny - 7, anchor="w",
+                                  text=f"{prefix}{nl}", fill=tc,
+                                  font=("Segoe UI", 10, "bold" if is_best else "normal"))
+                    c.create_text(nx + R + 6, ny + 8, anchor="w",
+                                  text=f"Q: {nv:+.2f}", fill=tc,
+                                  font=("Segoe UI", 8))
+                else:
+                    active = abs(nv) > 0.1
+                    gv = int(min(255, abs(nv) * 350))
+                    bv = int(min(255, 100 + abs(nv) * 280))
+                    fill = f"#00{gv:02x}{bv:02x}" if active else "#141c28"
+                    outline = "#00c8f0" if active else "#2d3748"
+                    c.create_oval(nx - R, ny - R, nx + R, ny + R,
+                                  fill=fill, outline=outline, width=2 if active else 1)
+                    if nl:
+                        c.create_text(nx - R - 4, ny, anchor="e",
+                                      text=nl, fill="#7a8ea0", font=("Segoe UI", 8))
+
+        # Bottom bar
+        c.create_text(W // 2, H - 14,
+                       text=f"WINNING: {act_labels[best]}  |  Q: {q_vals[best]:+.2f}  |  Close window or press 'N' to hide",
+                       fill="#00d0e8", font=("Segoe UI", 9))
+
+        # Schedule next frame (20 FPS)
+        if self.alive:
+            self.root.after(50, self._draw)
+
+    def close(self):
+        self.alive = False
         try:
-            self.canvas.delete("all")
-            width = self.canvas.winfo_width() or 830
-            height = self.canvas.winfo_height() or 450
-            
-            acts = getattr(self.agent, 'latest_activations', None) if self.agent else None
-            inp = acts.get('input', np.zeros(16)) if acts else np.zeros(16)
-            h1 = acts.get('h1', np.zeros(64)) if acts else np.zeros(64)
-            h2 = acts.get('h2', np.zeros(64)) if acts else np.zeros(64)
-            q_vals = acts.get('q_values', np.zeros(5)) if acts else np.zeros(5)
-            best_act = np.argmax(q_vals)
-            
-            # Layer X Coordinates
-            col_x = [width * 0.14, width * 0.38, width * 0.62, width * 0.85]
-            
-            # 1. Draw Layer Labels
-            self.canvas.create_text(col_x[0], 25, text="INPUT LAYER (16)", fill="#00f0ff", font=('Segoe UI', 10, 'bold'))
-            self.canvas.create_text(col_x[1], 25, text="HIDDEN L1 (64)", fill="#38bdf8", font=('Segoe UI', 10, 'bold'))
-            self.canvas.create_text(col_x[2], 25, text="HIDDEN L2 (64)", fill="#38bdf8", font=('Segoe UI', 10, 'bold'))
-            self.canvas.create_text(col_x[3], 25, text="OUTPUT ACTIONS (5)", fill="#a7f3d0", font=('Segoe UI', 10, 'bold'))
-            
-            # 2. Compute Node Positions
-            # Input Nodes (8 sampled)
-            input_names = ["Bob X", "Bob Y", "Vel X", "Vel Y", "Target dx", "Target dy", "Grounded", "Time Rem"]
-            in_nodes = []
-            for i in range(8):
-                y = 65 + i * 45
-                in_nodes.append((col_x[0], y, abs(float(inp[i])) if i < len(inp) else 0.0, input_names[i]))
-                
-            # Hidden 1 Nodes (8 sampled)
-            h1_nodes = []
-            for i in range(8):
-                y = 65 + i * 45
-                val = float(h1[i * 8]) if (i * 8) < len(h1) else 0.0
-                h1_nodes.append((col_x[1], y, val, f"H1-{i+1}"))
-                
-            # Hidden 2 Nodes (8 sampled)
-            h2_nodes = []
-            for i in range(8):
-                y = 65 + i * 45
-                val = float(h2[i * 8]) if (i * 8) < len(h2) else 0.0
-                h2_nodes.append((col_x[2], y, val, f"H2-{i+1}"))
-                
-            # Output Action Nodes (5)
-            action_names = ["0: BACK (-X)", "1: FWD (+X)", "2: LEFT (-Y)", "3: RIGHT (+Y)", "4: JUMP (+Z)"]
-            out_nodes = []
-            for i in range(5):
-                y = 95 + i * 65
-                out_nodes.append((col_x[3], y, float(q_vals[i]), action_names[i]))
-                
-            # 3. Draw Synapse Connection Lines (Edges) between layers
-            layers = [in_nodes, h1_nodes, h2_nodes, out_nodes]
-            for l in range(3):
-                curr_l = layers[l]
-                next_l = layers[l+1]
-                for n1 in curr_l[:4]:
-                    for n2 in next_l[:4]:
-                        val1, val2 = n1[2], n2[2]
-                        intensity = min(1.0, max(0.1, (val1 + val2) * 0.5))
-                        color = f"#{int(intensity*0):02x}{int(intensity*200):02x}{int(intensity*255):02x}"
-                        width_line = 1 if intensity < 0.4 else 2
-                        self.canvas.create_line(n1[0] + 15, n1[1], n2[0] - 15, n2[1], fill=color, width=width_line)
-
-            # 4. Draw Nodes (Circles & Labels)
-            for l_idx, layer in enumerate(layers):
-                for i, (nx, ny, nval, nlabel) in enumerate(layer):
-                    r = 14
-                    if l_idx == 3: # Output layer
-                        is_winner = (i == best_act)
-                        fill_col = "#059669" if is_winner else "#1e293b"
-                        outline_col = "#00f0ff" if is_winner else "#475569"
-                        text_col = "#ffffff" if is_winner else "#94a3b8"
-                        
-                        # Node Circle
-                        self.canvas.create_oval(nx - r, ny - r, nx + r, ny + r, fill=fill_col, outline=outline_col, width=3 if is_winner else 1)
-                        # Action Label + Q-Value
-                        pref = "★ WINNER: " if is_winner else ""
-                        self.canvas.create_text(nx + 25, ny, text=f"{pref}{nlabel} [Q: {nval:+.2f}]", fill=text_col, font=('Segoe UI', 9, 'bold' if is_winner else 'normal'), anchor='w')
-                    else:
-                        is_active = (nval > 0.1)
-                        fill_col = "#00f0ff" if is_active else "#1e293b"
-                        outline_col = "#38bdf8" if is_active else "#334155"
-                        
-                        self.canvas.create_oval(nx - r, ny - r, nx + r, ny + r, fill=fill_col, outline=outline_col, width=2 if is_active else 1)
-                        self.canvas.create_text(nx - 22, ny, text=nlabel, fill="#94a3b8", font=('Segoe UI', 8), anchor='e')
-
-        except Exception as e:
+            self.root.after(0, self.root.destroy)
+        except:
             pass
-            
-        # Schedule next update (20 FPS)
-        if self.running:
-            self.root.after(50, self.draw_network)
-            
-    def update_data(self, agent):
-        self.agent = agent
-
-def launch_standalone_visualizer(agent=None):
-    vis = InteractiveNeuralVisualizer(master=None, agent=agent)
-    vis.root.mainloop()
