@@ -7,6 +7,7 @@ or dedicated PyBullet physics processes (--visual, --headless, --demo).
 import sys
 import os
 import time
+import pybullet as p
 
 def run_session(mode="visual", level=1):
     from utils import TimeManager
@@ -21,39 +22,59 @@ def run_session(mode="visual", level=1):
     
     print(f"\n==================================================")
     print(f"  BOB'S TESTING FACILITY - Mode: {mode.upper()} | Stage: {level:02d}")
+    print(f"  (Window will remain open continuously. Close PyBullet window to end session.)")
     print(f"==================================================\n")
     
-    episodes = 50 if mode == "headless" else 20
-    for ep in range(episodes):
-        obs, info = env.reset(level=level)
-        total_reward = 0
-        steps = 0
-        
+    ep = 0
+    try:
         while True:
-            on_ground = env.on_ground
-            eval_mode = (mode == "demo")
-            action = agent.act(obs, stuck=(env.stuck_counter > 40), on_ground=on_ground, eval_mode=eval_mode)
-            next_obs, reward, done, truncated, info = env.step(action)
+            ep += 1
+            obs, info = env.reset(level=level)
+            total_reward = 0
+            steps = 0
             
-            if mode != "demo":
-                agent.memory.push(obs, action, reward, next_obs, done)
-                agent.train_step()
+            while True:
+                on_ground = env.on_ground
+                eval_mode = (mode == "demo")
+                action = agent.act(obs, stuck=(env.stuck_counter > 40), on_ground=on_ground, eval_mode=eval_mode)
                 
-            obs = next_obs
-            total_reward += reward
-            steps += 1
-            
-            if render:
-                time.sleep(0.015)
+                try:
+                    next_obs, reward, done, truncated, info = env.step(action)
+                except Exception as e:
+                    # User closed PyBullet GUI window
+                    print(f"\n  [Session Ended]: PyBullet window closed by user.")
+                    return
                 
-            if done:
                 if mode != "demo":
-                    agent.update_epsilon()
-                status_str = "PASSED SUCCESS!" if info.get('success') else f"FAILED ({info.get('failure_reason')})"
-                print(f"  [Ep {ep+1}/{episodes}] Stage {level:02d} | {status_str} | Reward: {total_reward:.1f} | Steps: {steps}")
+                    agent.memory.push(obs, action, reward, next_obs, done)
+                    agent.train_step()
+                    
+                obs = next_obs
+                total_reward += reward
+                steps += 1
+                
+                if render:
+                    time.sleep(0.016)
+                    
+                if done:
+                    if mode != "demo":
+                        agent.update_epsilon()
+                    status_str = "PASSED SUCCESS!" if info.get('success') else f"FAILED ({info.get('failure_reason')})"
+                    print(f"  [Episode {ep:03d}] Stage {level:02d} | {status_str} | Reward: {total_reward:.1f} | Steps: {steps} | Epsilon: {agent.epsilon:.3f}")
+                    time.sleep(0.5)  # Brief pause between episodes for smooth visual transition
+                    break
+                    
+            if mode == "headless" and ep >= 100:
+                print("  [Headless Training Batch Completed (100 Episodes)].")
                 break
                 
-    env.close()
+    except KeyboardInterrupt:
+        print("\n  [Session Interrupted by User].")
+    finally:
+        try:
+            env.close()
+        except:
+            pass
 
 def main():
     level = 1
