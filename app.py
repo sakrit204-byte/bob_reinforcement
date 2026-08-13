@@ -251,100 +251,25 @@ class BobsFacilityApp:
             pass
 
     def cmd_start_visual_training(self):
+        import subprocess
         level = int(self.stage_spin.get())
-        self.log_msg(f"Starting Visual Training Room (GUI Window) for Stage {level:02d}...")
-        threading.Thread(target=self._run_visual_training, args=(level,), daemon=True).start()
-
-    def _run_visual_training(self, level):
-        try:
-            env = BobsWorld3D(render=True)
-            obs, info = env.reset(level=level)
-            self.log_msg(f"Visual Training Started! Press Ctrl+C or close PyBullet window to end session.")
-            
-            total_reward = 0
-            steps = 0
-            while True:
-                on_ground = env.on_ground
-                action = self.agent.act(obs, stuck=(env.stuck_counter > 40), on_ground=on_ground)
-                next_obs, reward, done, truncated, info = env.step(action)
-                
-                self.agent.memory.push(obs, action, reward, next_obs, done)
-                self.agent.train_step()
-                
-                obs = next_obs
-                total_reward += reward
-                steps += 1
-                
-                if done:
-                    self.agent.update_epsilon()
-                    success_str = "PASSED SUCCESS!" if info.get('success') else f"FAILED ({info.get('failure_reason')})"
-                    self.log_msg(f"Episode Done | {success_str} | Total Reward: {total_reward:.1f} | Steps: {steps}")
-                    break
-                    
-            env.close()
-            self._update_telemetry_labels()
-        except Exception as e:
-            self.log_msg(f"Visual Training Session Ended: {e}")
+        self.log_msg(f"Launching Visual Training Room (GUI Window) for Stage {level:02d} in dedicated process...")
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bob.py")
+        subprocess.Popen([sys.executable, script_path, "--visual", "--level", str(level)])
 
     def cmd_start_headless_training(self):
+        import subprocess
         level = int(self.stage_spin.get())
-        self.log_msg(f"Starting High-Speed Accelerated Headless Training for Stage {level:02d}...")
-        threading.Thread(target=self._run_headless_training, args=(level, 10), daemon=True).start()
-
-    def _run_headless_training(self, level, num_episodes):
-        try:
-            env = BobsWorld3D(render=False)
-            for ep in range(num_episodes):
-                obs, info = env.reset(level=level)
-                total_reward = 0
-                steps = 0
-                while True:
-                    on_ground = env.on_ground
-                    action = self.agent.act(obs, stuck=(env.stuck_counter > 40), on_ground=on_ground)
-                    next_obs, reward, done, truncated, info = env.step(action)
-                    
-                    self.agent.memory.push(obs, action, reward, next_obs, done)
-                    self.agent.train_step()
-                    
-                    obs = next_obs
-                    total_reward += reward
-                    steps += 1
-                    
-                    if done:
-                        self.agent.update_epsilon()
-                        success_str = "PASSED!" if info.get('success') else "FAILED"
-                        self.log_msg(f"[Headless Ep {ep+1}/{num_episodes}] Stage {level:02d} | {success_str} | Reward: {total_reward:.1f} | Steps: {steps}")
-                        break
-            env.close()
-            self.log_msg("Accelerated Headless Training Batch Completed!")
-            self._update_telemetry_labels()
-        except Exception as e:
-            self.log_msg(f"Headless Training Exception: {e}")
+        self.log_msg(f"Launching High-Speed Accelerated Headless Training for Stage {level:02d}...")
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bob.py")
+        subprocess.Popen([sys.executable, script_path, "--headless", "--level", str(level)])
 
     def cmd_watch_demo(self):
+        import subprocess
         level = int(self.stage_spin.get())
         self.log_msg(f"Launching Watch Bob Test Run (Demo Mode) for Stage {level:02d}...")
-        threading.Thread(target=self._run_demo, args=(level,), daemon=True).start()
-
-    def _run_demo(self, level):
-        try:
-            env = BobsWorld3D(render=True)
-            obs, info = env.reset(level=level)
-            steps = 0
-            while True:
-                on_ground = env.on_ground
-                action = self.agent.act(obs, stuck=False, on_ground=on_ground, eval_mode=True)
-                next_obs, reward, done, truncated, info = env.step(action)
-                obs = next_obs
-                steps += 1
-                time.sleep(0.015)
-                if done:
-                    status_str = "SUCCESSFULLY CLEARED ROOM!" if info.get('success') else "TEST RUN FAILED"
-                    self.log_msg(f"Demo Test Run Finished | {status_str} | Total Steps: {steps}")
-                    break
-            env.close()
-        except Exception as e:
-            self.log_msg(f"Demo Mode Session Ended: {e}")
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bob.py")
+        subprocess.Popen([sys.executable, script_path, "--demo", "--level", str(level)])
 
     def cmd_view_stats(self):
         times = self.agent.time_manager.best_times
