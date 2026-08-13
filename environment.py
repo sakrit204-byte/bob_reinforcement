@@ -76,6 +76,116 @@ class DigitalBoardScreen:
         img.save(self.save_path)
         return self.save_path, True
 
+
+class NeuralNetworkScreen:
+    """Generates a neural network node-and-synapse diagram as a PIL texture for the 3D panel."""
+    def __init__(self, save_path="C:/Users/ACER/Desktop/24bce2954/bob_saves/nn_screen.png"):
+        self.save_path = save_path
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        self.width = 640
+        self.height = 400
+        self.last_hash = ""
+        
+        try:
+            self.font_title = ImageFont.truetype("arialbd.ttf", 16)
+            self.font_label = ImageFont.truetype("arial.ttf", 11)
+            self.font_val = ImageFont.truetype("arialbd.ttf", 13)
+        except:
+            self.font_title = ImageFont.load_default()
+            self.font_label = ImageFont.load_default()
+            self.font_val = ImageFont.load_default()
+
+    def generate(self, inp, h1, h2, q_vals, best_act):
+        """Returns (save_path, changed)."""
+        # Build a coarse hash so we don't re-render identical frames
+        sig = f"{best_act}_{np.round(q_vals, 1).tobytes().hex()[:16]}"
+        if sig == self.last_hash and os.path.exists(self.save_path):
+            return self.save_path, False
+        self.last_hash = sig
+
+        W, H = self.width, self.height
+        img = Image.new("RGB", (W, H), (10, 14, 22))
+        draw = ImageDraw.Draw(img)
+
+        # Border
+        draw.rectangle([2, 2, W - 3, H - 3], outline=(0, 200, 220), width=2)
+
+        # Title
+        draw.text((W // 2 - 120, 8), "NEURAL NETWORK  |  LIVE ACTIVATIONS", fill=(0, 230, 255), font=self.font_title)
+
+        # Layer columns
+        col_x = [int(W * 0.10), int(W * 0.35), int(W * 0.60), int(W * 0.85)]
+        layer_labels = ["INPUT (16)", "HIDDEN L1 (128)", "HIDDEN L2 (128)", "OUTPUT (5)"]
+        for i, lbl in enumerate(layer_labels):
+            draw.text((col_x[i] - 30, 32), lbl, fill=(100, 180, 220), font=self.font_label)
+
+        # Node positions per layer
+        input_names = ["X", "Y", "VX", "VY", "dx", "dy", "Gnd", "T"]
+        action_names = ["BACK", "FWD", "LEFT", "RIGHT", "JUMP"]
+
+        nodes = [[], [], [], []]
+        # Input: 8 sampled
+        for i in range(8):
+            y = 60 + i * 38
+            val = abs(float(inp[i])) if i < len(inp) else 0.0
+            nodes[0].append((col_x[0], y, val, input_names[i]))
+        # H1: 8 sampled
+        for i in range(8):
+            y = 60 + i * 38
+            val = float(h1[i * 16]) if (i * 16) < len(h1) else 0.0
+            nodes[1].append((col_x[1], y, val, ""))
+        # H2: 8 sampled
+        for i in range(8):
+            y = 60 + i * 38
+            val = float(h2[i * 16]) if (i * 16) < len(h2) else 0.0
+            nodes[2].append((col_x[2], y, val, ""))
+        # Output: 5
+        for i in range(5):
+            y = 90 + i * 55
+            val = float(q_vals[i])
+            nodes[3].append((col_x[3], y, val, action_names[i]))
+
+        # Draw synapse lines between adjacent layers
+        for l in range(3):
+            for (x1, y1, v1, _) in nodes[l]:
+                for (x2, y2, v2, _) in nodes[l + 1]:
+                    intensity = min(1.0, max(0.0, (abs(v1) + abs(v2)) * 0.4))
+                    if intensity < 0.05:
+                        continue
+                    r = int(intensity * 40)
+                    g = int(intensity * 180)
+                    b = int(120 + intensity * 135)
+                    draw.line([(x1, y1), (x2, y2)], fill=(r, g, b), width=1)
+
+        # Draw nodes
+        R = 10
+        for l in range(4):
+            for i, (nx, ny, nval, nlabel) in enumerate(nodes[l]):
+                if l == 3:  # Output
+                    is_best = (i == best_act)
+                    fill = (10, 200, 100) if is_best else (30, 40, 55)
+                    outline = (0, 255, 180) if is_best else (80, 100, 120)
+                    draw.ellipse([nx - R, ny - R, nx + R, ny + R], fill=fill, outline=outline, width=2)
+                    tc = (255, 255, 255) if is_best else (160, 170, 180)
+                    prefix = ">> " if is_best else ""
+                    draw.text((nx + R + 4, ny - 8), f"{prefix}{nlabel}", fill=tc, font=self.font_val)
+                    draw.text((nx + R + 4, ny + 4), f"Q:{nval:+.1f}", fill=tc, font=self.font_label)
+                else:
+                    active = abs(nval) > 0.1
+                    fill = (0, int(min(255, abs(nval) * 400)), int(min(255, 120 + abs(nval) * 300))) if active else (20, 28, 38)
+                    outline = (0, 200, 240) if active else (50, 60, 75)
+                    draw.ellipse([nx - R, ny - R, nx + R, ny + R], fill=fill, outline=outline, width=2 if active else 1)
+                    if nlabel:
+                        draw.text((nx - R - 22, ny - 6), nlabel, fill=(140, 160, 180), font=self.font_label)
+
+        # Bottom status
+        draw.text((10, H - 22), f"WINNING ACTION: {action_names[best_act]}  |  Q: {q_vals[best_act]:+.2f}  |  PRESS 'N' TO HIDE", fill=(0, 220, 240), font=self.font_label)
+
+        img.save(self.save_path)
+        return self.save_path, True
+
+
+
 class CameraMode:
     BLENDER_CONTROLS = "Blender Controls (MMB Drag = Rotate | Left Click Drag = Pan | Scroll = Zoom)"
     FOLLOW = "Side-Profile Track View"
@@ -1016,135 +1126,75 @@ class BobsWorld3D(gym.Env):
         self.agent = agent
 
     def _render_nn_visualizer(self):
-        """Renders GTA V Minimap-style Live Neural Network Node & Synapse Graph Overlay on key 'N'!"""
-        if not self.render_mode or not getattr(self, 'show_nn_visualizer', False):
-            if hasattr(self, 'nn_ui_ids'):
-                for uid in self.nn_ui_ids:
-                    try:
-                        p.removeUserDebugItem(uid)
-                    except:
-                        pass
-                self.nn_ui_ids = []
-            return
-            
-        if not hasattr(self, 'nn_ui_ids'):
-            self.nn_ui_ids = []
-            
-        for uid in self.nn_ui_ids:
-            try:
-                p.removeUserDebugItem(uid)
-            except:
-                pass
-        self.nn_ui_ids = []
-        
-        acts = getattr(self.agent, 'latest_activations', None) if getattr(self, 'agent', None) else None
-        
-        # GTA V Inset Window Screen Position (Fixed 3D Glass Panel Frame Overlay)
-        anchor_x, anchor_y, anchor_z = 0.6, 2.65, 3.85
-        
-        # Glass Backdrop Frame Header
-        t_header = p.addUserDebugText(
-            "🧠 [ BOB'S NEURAL BRAIN NETWORK - LIVE SYNAPSE GRAPH (PRESS 'N' TO CLOSE) ]",
-            [anchor_x, anchor_y, anchor_z],
-            textColorRGB=[0.0, 0.95, 1.0], textSize=1.35, lifeTime=0
-        )
-        self.nn_ui_ids.append(t_header)
-        
-        if acts is None:
-            t_sb = p.addUserDebugText("STANDBY: Awaiting Neural Model Forward Pass...", [anchor_x, anchor_y, anchor_z - 0.4], textColorRGB=[0.8, 0.8, 0.8], textSize=1.2, lifeTime=0)
-            self.nn_ui_ids.append(t_sb)
-            return
-
-        inp = acts.get('input', np.zeros(16))
-        h1 = acts.get('h1', np.zeros(64))
-        h2 = acts.get('h2', np.zeros(64))
-        q_vals = acts.get('q_values', np.zeros(5))
-        best_act = np.argmax(q_vals)
-        
-        # 4 Network Graph Layers: Input (0), Hidden 1 (1), Hidden 2 (2), Output (3)
-        layer_x_offsets = [0.0, 1.4, 2.8, 4.2]
-        node_positions = {}
-        
-        # Layer 0: 8 Representative Inputs
-        input_labels = ["X-Pos", "Y-Pos", "Vel-X", "Vel-Y", "dx-Target", "dy-Target", "Grounded", "Time-Rem"]
-        node_positions[0] = []
-        z_start = anchor_z - 0.35
-        for i in range(8):
-            val = float(inp[i]) if i < len(inp) else 0.0
-            pos = [anchor_x + layer_x_offsets[0], anchor_y, z_start - (i * 0.18)]
-            node_positions[0].append((pos, abs(val), input_labels[i]))
-            
-        # Layer 1: 8 Active Hidden Neurons (sampled from 64)
-        node_positions[1] = []
-        for i in range(8):
-            val = float(h1[i * 8]) if (i * 8) < len(h1) else 0.0
-            pos = [anchor_x + layer_x_offsets[1], anchor_y, z_start - (i * 0.18)]
-            node_positions[1].append((pos, val, f"H1-{i+1}"))
-            
-        # Layer 2: 8 Active Hidden Neurons (sampled from 64)
-        node_positions[2] = []
-        for i in range(8):
-            val = float(h2[i * 8]) if (i * 8) < len(h2) else 0.0
-            pos = [anchor_x + layer_x_offsets[2], anchor_y, z_start - (i * 0.18)]
-            node_positions[2].append((pos, val, f"H2-{i+1}"))
-            
-        # Layer 3: 5 Output Actions
-        action_names = ["0: BACK (-X)", "1: FWD (+X)", "2: LEFT (-Y)", "3: RIGHT (+Y)", "4: JUMP (+Z)"]
-        node_positions[3] = []
-        z_start_out = anchor_z - 0.45
-        for i in range(5):
-            val = float(q_vals[i])
-            pos = [anchor_x + layer_x_offsets[3], anchor_y, z_start_out - (i * 0.25)]
-            node_positions[3].append((pos, val, action_names[i]))
-            
-        # DRAW LIVE SYNAPSE CONNECTION EDGES (p.addUserDebugLine) BETWEEN LAYERS!
-        for l_idx in range(3):
-            curr_nodes = node_positions[l_idx]
-            next_nodes = node_positions[l_idx + 1]
-            
-            for n1_pos, n1_val, _ in curr_nodes[:4]:
-                for n2_pos, n2_val, _ in next_nodes[:4]:
-                    intensity = min(1.0, (n1_val + n2_val) * 0.5)
-                    if intensity > 0.05:
-                        col = [0.0, intensity, 1.0] if l_idx < 2 else [0.2, 1.0, 0.4]
-                        line_id = p.addUserDebugLine(n1_pos, n2_pos, lineColorRGB=col, lineWidth=1.5, lifeTime=0)
-                        self.nn_ui_ids.append(line_id)
-
-        # DRAW NEURON NODES & TEXT LABELS
-        for l_idx in range(4):
-            for i, (pos, val, label) in enumerate(node_positions[l_idx]):
-                if l_idx == 3: # Output layer
-                    is_winner = (i == best_act)
-                    color = [1.0, 0.9, 0.0] if is_winner else [0.6, 0.6, 0.6]
-                    prefix = "★ " if is_winner else "  "
-                    node_txt = f"{prefix}{label} -> Q: {val:+.2f}"
-                    size = 1.3 if is_winner else 1.0
-                    tid = p.addUserDebugText(node_txt, pos, textColorRGB=color, textSize=size, lifeTime=0)
-                    self.nn_ui_ids.append(tid)
-                else: # Hidden/Input layers
-                    heat_symbol = "●" if val > 0.2 else "○"
-                    color = [0.0, 1.0, 0.8] if val > 0.2 else [0.4, 0.4, 0.5]
-                    tid = p.addUserDebugText(f"{heat_symbol} {label}", pos, textColorRGB=color, textSize=1.0, lifeTime=0)
-                    self.nn_ui_ids.append(tid)
-
-    def _update_ui(self):
-        """Updates the 3D board texture only when displayed content actually changes."""
+        """Renders neural network as a 3D textured panel (like the billboard). No debug text/lines."""
         if not self.render_mode:
             return
-            
+
+        show = getattr(self, 'show_nn_visualizer', False)
+
+        # Hide the panel when toggled off
+        if not show:
+            if getattr(self, 'nn_panel_id', None) is not None:
+                p.removeBody(self.nn_panel_id)
+                self.nn_panel_id = None
+            return
+
+        # Throttle: only update every 10 frames
+        if not hasattr(self, '_nn_frame_counter'):
+            self._nn_frame_counter = 0
+        self._nn_frame_counter += 1
+        if self._nn_frame_counter % 10 != 1 and getattr(self, 'nn_panel_id', None) is not None:
+            return
+
+        acts = getattr(self.agent, 'latest_activations', None) if getattr(self, 'agent', None) else None
+        inp = acts.get('input', np.zeros(16)) if acts else np.zeros(16)
+        h1 = acts.get('h1', np.zeros(64)) if acts else np.zeros(64)
+        h2 = acts.get('h2', np.zeros(64)) if acts else np.zeros(64)
+        q_vals = acts.get('q_values', np.zeros(5)) if acts else np.zeros(5)
+        best_act = int(np.argmax(q_vals))
+
+        # Generate PIL texture image
+        if not hasattr(self, '_nn_screen_gen'):
+            self._nn_screen_gen = NeuralNetworkScreen()
+
+        tex_path, changed = self._nn_screen_gen.generate(inp, h1, h2, q_vals, best_act)
+
+        if changed or getattr(self, 'nn_panel_id', None) is None:
+            tex_id = p.loadTexture(tex_path)
+
+            # Remove old panel body and create fresh one with new texture
+            if getattr(self, 'nn_panel_id', None) is not None:
+                p.removeBody(self.nn_panel_id)
+
+            self.nn_panel_id = p.createMultiBody(
+                baseMass=0,
+                baseVisualShapeIndex=p.createVisualShape(
+                    p.GEOM_BOX, halfExtents=[3.2, 0.03, 2.0],
+                    rgbaColor=[1.0, 1.0, 1.0, 1.0],
+                    specularColor=[0.6, 0.6, 0.6]
+                ),
+                basePosition=[6.0, -2.90, 2.5]
+            )
+            p.changeVisualShape(self.nn_panel_id, -1, textureUniqueId=tex_id)
+
+    def _update_ui(self):
+        """Updates the 3D board texture and NN panel only when content changes."""
+        if not self.render_mode:
+            return
+
         self._handle_keyboard_events()
         self._handle_mouse_events()
         self._update_camera()
         self._render_nn_visualizer()
-        
+
         remaining = self.time_manager.get_remaining_time()
         active_count = sum(1 for p_item in self.pressure_plates if p_item['activated'])
         total_count = len(self.pressure_plates)
-        door_status_str = "DOOR OPEN" if self.door_open else ("OPENING..." if self.door_opening else ("LOCKED" if self.door_locked_bumped else "LOCKED"))
-        
+        door_status_str = "DOOR OPEN" if self.door_open else ("OPENING..." if self.door_opening else "LOCKED")
+
         if not hasattr(self, 'board_screen_gen'):
             self.board_screen_gen = DigitalBoardScreen()
-            
+
         tex_path, changed = self.board_screen_gen.generate(
             stage_num=self.current_level,
             remaining_time=remaining,
@@ -1152,7 +1202,6 @@ class BobsWorld3D(gym.Env):
             total_plates=total_count,
             door_status=door_status_str
         )
-        # Only reload texture from disk when the image actually changed
         if changed and getattr(self, 'board_body_id', None) is not None:
             tex_id = p.loadTexture(tex_path)
             self.board_screen_gen.cached_tex_id = tex_id
