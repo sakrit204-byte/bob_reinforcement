@@ -236,8 +236,10 @@ class BobsWorld3D(gym.Env):
             
             # Completely reset position bounds and lock orientation to [0, 0, 0, 1] on every sub-step!
             pos, _ = p.getBasePositionAndOrientation(self.bob)
-            bounded_y = max(-2.85, min(2.85, pos[1]))
-            p.resetBasePositionAndOrientation(self.bob, [pos[0], bounded_y, pos[2]], [0, 0, 0, 1])
+            bounded_x = max(0.45, min(11.75, pos[0]))
+            bounded_y = max(-2.70, min(2.70, pos[1]))
+            bounded_z = max(0.45, pos[2])
+            p.resetBasePositionAndOrientation(self.bob, [bounded_x, bounded_y, bounded_z], [0, 0, 0, 1])
 
             if self.stuck_counter > 100:
                 p.applyExternalForce(
@@ -570,15 +572,15 @@ class BobsWorld3D(gym.Env):
         tex_id = p.loadTexture(tex_path)
         self.board_screen_gen.cached_tex_id = tex_id
 
-        # 2:1 aspect ratio panel (2.4m wide x 1.2m tall), mounted on back wall at eye level
+        # 4:1 aspect ratio panel (3.6m wide x 0.9m tall), mounted on back wall at eye level
         self.board_body_id = p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
-                p.GEOM_BOX, halfExtents=[2.4, 0.02, 1.2],
+                p.GEOM_BOX, halfExtents=[1.8, 0.02, 0.45],
                 rgbaColor=[1.0, 1.0, 1.0, 1.0],
                 specularColor=[0.4, 0.4, 0.4]
             ),
-            basePosition=[6.0, 2.92, 2.5]
+            basePosition=[6.0, 2.92, 2.2]
         )
         p.changeVisualShape(self.board_body_id, -1, textureUniqueId=tex_id)
 
@@ -593,15 +595,15 @@ class BobsWorld3D(gym.Env):
         door_tex_id = p.loadTexture(door_tex_path)
         self.door_screen_gen.cached_tex_id = door_tex_id
 
-        # 1:1 square panel (0.9m x 0.9m), mounted on right wall above door
+        # 2:1 landscape panel (1.6m wide x 0.8m tall), mounted on right wall above door
         self.door_board_id = p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
-                p.GEOM_BOX, halfExtents=[0.02, 0.9, 0.9],
+                p.GEOM_BOX, halfExtents=[0.02, 0.8, 0.4],
                 rgbaColor=[1.0, 1.0, 1.0, 1.0],
                 specularColor=[0.4, 0.4, 0.4]
             ),
-            basePosition=[11.92, self.target_y, 2.6]
+            basePosition=[11.92, self.target_y, 2.3]
         )
         p.changeVisualShape(self.door_board_id, -1, textureUniqueId=door_tex_id)
 

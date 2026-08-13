@@ -12,100 +12,93 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 class DigitalBoardScreen:
-    """Generates the main stats billboard texture (back wall)."""
+    """Generates the main stats billboard texture (back wall). Wide 4:1 landscape."""
     def __init__(self, save_path="C:/Users/ACER/Desktop/24bce2954/bob_saves/board_screen.png"):
         self.save_path = save_path
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         self.width = 512
-        self.height = 256
+        self.height = 128
         self.last_hash = ""
         self.cached_tex_id = None
 
     def generate(self, stage_num=1, remaining_time=18.0, active_plates=0, total_plates=1, door_status="DOOR LOCKED"):
         """Returns (save_path, changed) where changed is True if the image was regenerated."""
-        state_hash = f"{stage_num}_{remaining_time:.1f}_{active_plates}_{total_plates}_{door_status}"
+        # Round time to whole seconds so texture only reloads once/second (not 10x/sec)
+        state_hash = f"{stage_num}_{int(remaining_time)}_{active_plates}_{total_plates}_{door_status}"
         if state_hash == self.last_hash and os.path.exists(self.save_path):
             return self.save_path, False
 
         self.last_hash = state_hash
         W, H = self.width, self.height
-        img = Image.new("RGBA", (W, H), (8, 12, 20, 240))
+        img = Image.new("RGBA", (W, H), (8, 12, 20, 230))
         draw = ImageDraw.Draw(img)
 
         try:
-            font_header = ImageFont.truetype("arialbd.ttf", 22)
-            font_value = ImageFont.truetype("arialbd.ttf", 28)
-            font_label = ImageFont.truetype("arial.ttf", 16)
+            font_title = ImageFont.truetype("arialbd.ttf", 14)
+            font_val = ImageFont.truetype("arialbd.ttf", 18)
+            font_sm = ImageFont.truetype("arial.ttf", 11)
         except Exception:
-            font_header = ImageFont.load_default()
-            font_value = font_header
-            font_label = font_header
+            font_title = ImageFont.load_default()
+            font_val = font_title
+            font_sm = font_title
 
-        # Outer cyan frame
-        draw.rectangle([2, 2, W - 3, H - 3], outline=(0, 200, 240, 255), width=3)
-        draw.rectangle([6, 6, W - 7, H - 7], outline=(0, 140, 180, 120), width=1)
+        # Thin cyan frame
+        draw.rectangle([1, 1, W - 2, H - 2], outline=(0, 200, 240, 200), width=2)
 
-        # Header
-        draw.text((16, 12), f"BOB'S LAB  |  STAGE {stage_num:02d}", fill=(0, 235, 255), font=font_header)
-        draw.line([16, 42, W - 16, 42], fill=(0, 200, 240, 100), width=2)
+        # Header line
+        draw.text((10, 6), f"STAGE {stage_num:02d}", fill=(0, 235, 255), font=font_title)
+        draw.line([10, 26, W - 10, 26], fill=(0, 200, 240, 80), width=1)
 
-        # Row 1: Plates status
+        # Three columns: TIME | PLATES | DOOR
+        col_w = W // 3
+
+        # Col 1: Time
+        time_color = (50, 255, 120) if remaining_time > 10.0 else ((255, 200, 30) if remaining_time > 5.0 else (255, 50, 50))
+        draw.text((12, 33), "TIME", fill=(100, 140, 160), font=font_sm)
+        draw.text((12, 48), f"{int(remaining_time)}s", fill=time_color, font=font_val)
+
+        # Col 2: Plates
         plates_color = (50, 255, 120) if active_plates == total_plates else (255, 200, 40)
-        draw.text((16, 54), "PLATES", fill=(120, 160, 180), font=font_label)
-        draw.text((16, 74), f"{active_plates} / {total_plates}", fill=plates_color, font=font_value)
+        draw.text((col_w + 12, 33), "PLATES", fill=(100, 140, 160), font=font_sm)
+        draw.text((col_w + 12, 48), f"{active_plates}/{total_plates}", fill=plates_color, font=font_val)
 
-        # Row 1 right: Door status text
+        # Col 3: Door
         door_open = door_status == "DOOR OPEN"
         door_color = (50, 255, 120) if door_open else (255, 60, 60)
-        draw.text((W // 2 + 10, 54), "EXIT DOOR", fill=(120, 160, 180), font=font_label)
-        draw.text((W // 2 + 10, 74), door_status, fill=door_color, font=font_value)
+        draw.text((col_w * 2 + 12, 33), "EXIT", fill=(100, 140, 160), font=font_sm)
+        draw.text((col_w * 2 + 12, 48), "OPEN" if door_open else "LOCKED", fill=door_color, font=font_val)
 
-        # Divider
-        draw.line([16, 115, W - 16, 115], fill=(0, 200, 240, 60), width=1)
-
-        # Row 2: Time
-        time_color = (50, 255, 120) if remaining_time > 10.0 else ((255, 200, 30) if remaining_time > 5.0 else (255, 50, 50))
-        draw.text((16, 124), "TIME REMAINING", fill=(120, 160, 180), font=font_label)
-        draw.text((16, 144), f"{remaining_time:.1f}s", fill=time_color, font=font_value)
-
-        # Row 2 right: Neural model
-        draw.text((W // 2 + 10, 124), "NEURAL MODEL", fill=(120, 160, 180), font=font_label)
-        draw.text((W // 2 + 10, 144), "ACTIVE", fill=(0, 220, 240), font=font_value)
-
-        # Bottom bar
-        draw.line([16, 190, W - 16, 190], fill=(0, 200, 240, 60), width=1)
-        draw.text((16, 200), "PRESS 'N' FOR LIVE NETWORK GRAPH", fill=(0, 180, 210, 180), font=font_label)
-
-        # Progress bar for plates
-        bar_x = 16
-        bar_y = 225
-        bar_w = W - 32
-        bar_h = 16
-        draw.rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], outline=(0, 140, 180, 120), width=1)
+        # Plate progress bar
+        draw.line([10, 78, W - 10, 78], fill=(0, 200, 240, 60), width=1)
+        bar_x, bar_y, bar_w, bar_h = 10, 84, W - 20, 10
+        draw.rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], outline=(0, 140, 180, 100), width=1)
         if total_plates > 0:
             fill_w = int(bar_w * active_plates / total_plates)
             if fill_w > 0:
-                draw.rectangle([bar_x + 1, bar_y + 1, bar_x + fill_w, bar_y + bar_h - 1],
-                               fill=(50, 255, 120, 200))
+                draw.rectangle([bar_x + 1, bar_y + 1, bar_x + fill_w, bar_y + bar_h - 1], fill=(50, 255, 120, 180))
+
+        # Footer
+        draw.text((10, 102), "PRESS 'N' FOR NEURAL NETWORK", fill=(0, 160, 190, 150), font=font_sm)
 
         img.save(self.save_path)
         return self.save_path, True
 
 
 class DoorStatusScreen:
-    """Generates the door status indicator billboard texture (near exit wall).
-    Shows a large red/green dot and countdown timer only."""
+    """Generates door status indicator (right wall near exit). Landscape 2:1 layout.
+    Left side: red/green dot. Right side: countdown timer."""
     def __init__(self, save_path="C:/Users/ACER/Desktop/24bce2954/bob_saves/door_status.png"):
         self.save_path = save_path
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         self.width = 256
-        self.height = 256
+        self.height = 128
         self.last_hash = ""
         self.cached_tex_id = None
 
     def generate(self, door_open=False, remaining_time=18.0):
         """Returns (save_path, changed)."""
-        state_hash = f"{'O' if door_open else 'C'}_{remaining_time:.1f}"
+        # Round time to whole seconds to prevent constant texture reload flashing
+        state_hash = f"{'O' if door_open else 'C'}_{int(remaining_time)}"
         if state_hash == self.last_hash and os.path.exists(self.save_path):
             return self.save_path, False
 
@@ -115,57 +108,55 @@ class DoorStatusScreen:
         draw = ImageDraw.Draw(img)
 
         try:
-            font_time = ImageFont.truetype("arialbd.ttf", 36)
-            font_label = ImageFont.truetype("arial.ttf", 16)
+            font_time = ImageFont.truetype("arialbd.ttf", 28)
+            font_label = ImageFont.truetype("arial.ttf", 11)
         except Exception:
             font_time = ImageFont.load_default()
             font_label = font_time
 
-        # Frame
-        draw.rectangle([2, 2, W - 3, H - 3], outline=(0, 200, 240, 200), width=2)
+        # Thin frame
+        draw.rectangle([1, 1, W - 2, H - 2], outline=(0, 200, 240, 180), width=2)
 
-        # --- Large status dot ---
-        dot_cx, dot_cy = W // 2, 75
-        dot_r = 42
-        # Outer glow ring
-        glow_color = (40, 255, 100, 80) if door_open else (255, 50, 50, 80)
-        draw.ellipse([dot_cx - dot_r - 8, dot_cy - dot_r - 8,
-                       dot_cx + dot_r + 8, dot_cy + dot_r + 8],
-                      fill=glow_color)
+        # --- Left half: Status dot ---
+        dot_cx, dot_cy = W // 4, H // 2
+        dot_r = 28
+        # Glow
+        glow_color = (40, 255, 100, 60) if door_open else (255, 50, 50, 60)
+        draw.ellipse([dot_cx - dot_r - 5, dot_cy - dot_r - 5,
+                       dot_cx + dot_r + 5, dot_cy + dot_r + 5], fill=glow_color)
         # Main dot
         dot_fill = (40, 255, 100) if door_open else (255, 40, 40)
         dot_outline = (80, 255, 160) if door_open else (255, 100, 100)
         draw.ellipse([dot_cx - dot_r, dot_cy - dot_r,
                        dot_cx + dot_r, dot_cy + dot_r],
-                      fill=dot_fill, outline=dot_outline, width=3)
-        # Inner bright core
-        core_r = 18
+                      fill=dot_fill, outline=dot_outline, width=2)
+        # Core
+        core_r = 12
         core_fill = (180, 255, 220) if door_open else (255, 180, 180)
         draw.ellipse([dot_cx - core_r, dot_cy - core_r,
-                       dot_cx + core_r, dot_cy + core_r],
-                      fill=core_fill)
+                       dot_cx + core_r, dot_cy + core_r], fill=core_fill)
+        # Label
+        label = "OPEN" if door_open else "LOCKED"
+        label_color = (40, 255, 100) if door_open else (255, 60, 60)
+        bbox = draw.textbbox((0, 0), label, font=font_label)
+        lw = bbox[2] - bbox[0]
+        draw.text((dot_cx - lw // 2, dot_cy + dot_r + 4), label, fill=label_color, font=font_label)
 
-        # Label under dot
-        status_text = "OPEN" if door_open else "LOCKED"
-        status_color = (40, 255, 100) if door_open else (255, 60, 60)
-        bbox = draw.textbbox((0, 0), status_text, font=font_label)
-        tw = bbox[2] - bbox[0]
-        draw.text(((W - tw) // 2, dot_cy + dot_r + 12), status_text, fill=status_color, font=font_label)
-
-        # Divider
-        draw.line([20, 155, W - 20, 155], fill=(0, 200, 240, 80), width=1)
-
-        # --- Timer ---
+        # --- Right half: Timer ---
+        right_cx = W * 3 // 4
         time_color = (50, 255, 120) if remaining_time > 10.0 else ((255, 200, 30) if remaining_time > 5.0 else (255, 50, 50))
-        time_str = f"{remaining_time:.1f}"
+        time_str = f"{int(remaining_time)}s"
         bbox = draw.textbbox((0, 0), time_str, font=font_time)
         tw = bbox[2] - bbox[0]
-        draw.text(((W - tw) // 2, 168), time_str, fill=time_color, font=font_time)
+        th = bbox[3] - bbox[1]
+        draw.text((right_cx - tw // 2, H // 2 - th // 2 - 6), time_str, fill=time_color, font=font_time)
+        # Small label
+        bbox = draw.textbbox((0, 0), "TIME", font=font_label)
+        lw = bbox[2] - bbox[0]
+        draw.text((right_cx - lw // 2, H // 2 + th // 2 + 2), "TIME", fill=(100, 140, 160), font=font_label)
 
-        # "SECONDS" label
-        bbox = draw.textbbox((0, 0), "SECONDS", font=font_label)
-        tw = bbox[2] - bbox[0]
-        draw.text(((W - tw) // 2, 212), "SECONDS", fill=(120, 160, 180), font=font_label)
+        # Vertical divider between halves
+        draw.line([W // 2, 8, W // 2, H - 8], fill=(0, 200, 240, 60), width=1)
 
         img.save(self.save_path)
         return self.save_path, True
