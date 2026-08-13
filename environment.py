@@ -127,7 +127,7 @@ class BobsWorld3D(gym.Env):
         self.current_step = 0
         self.level_completed = False
         self.stuck_counter = 0
-        self.last_bob_pos = [0.5, 0.0, 0.6]
+        self.last_bob_pos = [0.8, 0.0, 0.6]
         self.on_ground = True
         self.passed_obstacles.clear()
         
@@ -311,39 +311,39 @@ class BobsWorld3D(gym.Env):
             basePosition=[12.1, 0, 2.2]
         )
         
-        # 2026 INTEGRATED DIGITAL SCOREBOARD OBSIDIAN GLASS PANEL (Mounted at z = 4.25m on Back Wall)
+        # 2026 INTEGRATED DIGITAL SCOREBOARD OBSIDIAN GLASS PANEL (Mounted in Front of Back Wall at y = 2.65m)
         p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
-                p.GEOM_BOX, halfExtents=[4.8, 0.05, 0.52],
+                p.GEOM_BOX, halfExtents=[4.8, 0.04, 0.52],
                 rgbaColor=config.COLORS['hud_bg'],
                 specularColor=[0.9, 0.9, 0.9]
             ),
-            basePosition=[6.0, 2.92, 4.25]
+            basePosition=[6.0, 2.65, 4.25]
         )
         # Neon Cyan LED Glass Board Frame Borders
         p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
-                p.GEOM_BOX, halfExtents=[4.82, 0.06, 0.02],
+                p.GEOM_BOX, halfExtents=[4.82, 0.05, 0.02],
                 rgbaColor=config.COLORS['hud_frame'],
                 specularColor=[1.0, 1.0, 1.0]
             ),
-            basePosition=[6.0, 2.91, 4.77]
+            basePosition=[6.0, 2.64, 4.77]
         )
         p.createMultiBody(
             baseMass=0,
             baseVisualShapeIndex=p.createVisualShape(
-                p.GEOM_BOX, halfExtents=[4.82, 0.06, 0.02],
+                p.GEOM_BOX, halfExtents=[4.82, 0.05, 0.02],
                 rgbaColor=config.COLORS['hud_frame'],
                 specularColor=[1.0, 1.0, 1.0]
             ),
-            basePosition=[6.0, 2.91, 3.73]
+            basePosition=[6.0, 2.64, 3.73]
         )
 
     def _create_bob(self):
         """Creates 2026 Cyber-Orange Bob with LED Energy Belt & Specular Googly Eyes."""
-        spawn_x = 0.5
+        spawn_x = 0.8  # Clear spawn room away from entrance door frame
         spawn_y = 0.0
         self.bob = p.createMultiBody(
             baseMass=config.BOB_MASS,
@@ -937,11 +937,11 @@ class BobsWorld3D(gym.Env):
         
         # Mounted 3D Text directly ON the Suspended Glass Digital Scoreboard Screen Surface
         self.ui_texts['header'] = p.addUserDebugText(
-            f"[ 🧪 BOB'S TESTING FACILITY - {title_text} ]", [3.0, 2.88, 4.42],
+            f"[ 🧪 BOB'S TESTING FACILITY - {title_text} ]", [3.0, 2.60, 4.42],
             textColorRGB=[0.0, 0.95, 1.0], textSize=1.75, lifeTime=0
         )
         self.ui_texts['status'] = p.addUserDebugText(
-            "TIME: 18.0s  |  PLATES: 0/1 GREEN  |  DOOR: LOCKED", [2.5, 2.88, 4.02],
+            "TIME: 18.0s  |  PLATES: 0/1 GREEN  |  DOOR: LOCKED", [2.5, 2.60, 4.02],
             textColorRGB=[0.2, 1.0, 0.5], textSize=1.55, lifeTime=0
         )
 
@@ -975,7 +975,7 @@ class BobsWorld3D(gym.Env):
         
         ui_str = f"TIME: {remaining:.1f}s  |  PLATES: {active_count}/{total_count} GREEN  |  {door_status_str}"
         self.ui_texts['status'] = p.addUserDebugText(
-            ui_str, [2.5, 2.88, 4.02],
+            ui_str, [2.5, 2.60, 4.02],
             textColorRGB=color, textSize=1.55, lifeTime=0
         )
 
