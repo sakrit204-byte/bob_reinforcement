@@ -19,10 +19,11 @@ def run_session(mode="visual", level=1):
     time_mgr = TimeManager()
     env = BobsWorld3D(render=render, time_manager=time_mgr)
     agent = DQNAgent(state_dim=config.STATE_DIM, action_dim=config.ACTION_DIM)
+    env.attach_agent(agent)
     
     print(f"\n==================================================")
     print(f"  BOB'S TESTING FACILITY - Mode: {mode.upper()} | Stage: {level:02d}")
-    print(f"  (Window will remain open continuously. Close PyBullet window to end session.)")
+    print(f"  (Press 'N' key anytime in 3D viewport to toggle Live Neural Network Visualizer!)")
     print(f"==================================================\n")
     
     ep = 0

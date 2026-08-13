@@ -818,12 +818,18 @@ class BobsWorld3D(gym.Env):
         print(f"\n  [Testing Room Camera Toggled]: {self.camera_mode}")
 
     def _handle_keyboard_events(self):
-        """Listens for Blender Numpad Viewport Keys & saves camera state!"""
+        """Listens for Blender Numpad Viewport Keys & 'N' key for Live Neural Network HUD!"""
         if not self.render_mode:
             return
         keys = p.getKeyboardEvents()
         
-        if (99 in keys and (keys[99] & p.KEY_WAS_TRIGGERED)) or (67 in keys and (keys[67] & p.KEY_WAS_TRIGGERED)):
+        # 'N' or 'n' toggles Live Neural Network Visualizer Inset Window
+        if (110 in keys and (keys[110] & p.KEY_WAS_TRIGGERED)) or (78 in keys and (keys[78] & p.KEY_WAS_TRIGGERED)):
+            self.show_nn_visualizer = not getattr(self, 'show_nn_visualizer', False)
+            status_str = "ENABLED (Press 'N' to Hide)" if self.show_nn_visualizer else "DISABLED"
+            print(f"\n  [ 🧠 LIVE NEURAL NETWORK HUD ]: Visualizer Window {status_str}")
+            
+        elif (99 in keys and (keys[99] & p.KEY_WAS_TRIGGERED)) or (67 in keys and (keys[67] & p.KEY_WAS_TRIGGERED)):
             self.toggle_camera_mode()
             
         elif (51 in keys and (keys[51] & p.KEY_WAS_TRIGGERED)) or (65435 in keys and (keys[65435] & p.KEY_WAS_TRIGGERED)):
@@ -951,6 +957,93 @@ class BobsWorld3D(gym.Env):
             textColorRGB=[0.2, 1.0, 0.5], textSize=1.55, lifeTime=0
         )
 
+    def attach_agent(self, agent):
+        """Links agent to environment for Live Neural Network HUD Visualization."""
+        self.agent = agent
+
+    def _render_nn_visualizer(self):
+        """Renders Live Neural Network Inset Window HUD directly in the 3D viewport on key 'N'!"""
+        if not self.render_mode or not getattr(self, 'show_nn_visualizer', False):
+            if hasattr(self, 'nn_ui_ids'):
+                for uid in self.nn_ui_ids:
+                    try:
+                        p.removeUserDebugItem(uid)
+                    except:
+                        pass
+                self.nn_ui_ids = []
+            return
+            
+        if not hasattr(self, 'nn_ui_ids'):
+            self.nn_ui_ids = []
+            
+        for uid in self.nn_ui_ids:
+            try:
+                p.removeUserDebugItem(uid)
+            except:
+                pass
+        self.nn_ui_ids = []
+        
+        # Check if agent activations are available
+        acts = getattr(self.agent, 'latest_activations', None) if getattr(self, 'agent', None) else None
+        
+        # Inset Window Screen Anchor Coordinates
+        anchor_x, anchor_y, anchor_z = 0.5, 2.60, 3.80
+        
+        # Title Header
+        title_id = p.addUserDebugText(
+            "🧠 [ LIVE NEURAL NETWORK BRAIN INSET - PRESS 'N' TO CLOSE ]",
+            [anchor_x, anchor_y, anchor_z],
+            textColorRGB=[1.0, 0.9, 0.0], textSize=1.4, lifeTime=0
+        )
+        self.nn_ui_ids.append(title_id)
+        
+        if acts is not None:
+            inp = acts.get('input', np.zeros(16))
+            h1 = acts.get('h1', np.zeros(64))
+            h2 = acts.get('h2', np.zeros(64))
+            q_vals = acts.get('q_values', np.zeros(5))
+            
+            # Input Layer (16 Neurons)
+            dx = inp[8] if len(inp) > 8 else 0.0
+            dy = inp[9] if len(inp) > 9 else 0.0
+            inp_str = f"INPUTS (16 Neurons) -> Target dx: {dx:+.2f} | dy: {dy:+.2f} | Ground: {int(inp[6])} | Time: {inp[7]:.2f}"
+            t1 = p.addUserDebugText(inp_str, [anchor_x, anchor_y, anchor_z - 0.28], textColorRGB=[0.0, 0.9, 1.0], textSize=1.2, lifeTime=0)
+            self.nn_ui_ids.append(t1)
+            
+            # Hidden Layer 1 (64 Neurons Activity Heatmap)
+            h1_act_count = np.sum(h1 > 0.1)
+            h1_bars = "".join(["█" if v > 0.2 else ("▄" if v > 0.05 else "░") for v in h1[:24]])
+            h1_str = f"HIDDEN L1 (64 Neurons) -> Active: {h1_act_count}/64 | Heat: [{h1_bars}]"
+            t2 = p.addUserDebugText(h1_str, [anchor_x, anchor_y, anchor_z - 0.52], textColorRGB=[0.2, 1.0, 0.4], textSize=1.1, lifeTime=0)
+            self.nn_ui_ids.append(t2)
+            
+            # Hidden Layer 2 (64 Neurons Activity Heatmap)
+            h2_act_count = np.sum(h2 > 0.1)
+            h2_bars = "".join(["█" if v > 0.2 else ("▄" if v > 0.05 else "░") for v in h2[:24]])
+            h2_str = f"HIDDEN L2 (64 Neurons) -> Active: {h2_act_count}/64 | Heat: [{h2_bars}]"
+            t3 = p.addUserDebugText(h2_str, [anchor_x, anchor_y, anchor_z - 0.74], textColorRGB=[0.2, 1.0, 0.4], textSize=1.1, lifeTime=0)
+            self.nn_ui_ids.append(t3)
+            
+            # Output Action Q-Values Stream (5 Neurons)
+            actions_name = ["0: BACK (-X)", "1: FWD (+X)", "2: LEFT (-Y)", "3: RIGHT (+Y)", "4: JUMP (+Z)"]
+            best_act = np.argmax(q_vals)
+            
+            z_offset = anchor_z - 1.00
+            for a_idx in range(5):
+                q_v = q_vals[a_idx]
+                is_best = (a_idx == best_act)
+                prefix = "★ [WINNER]" if is_best else " "
+                col = [0.0, 1.0, 1.0] if is_best else [0.7, 0.7, 0.7]
+                size = 1.35 if is_best else 1.1
+                
+                act_line = f"{prefix} Q({actions_name[a_idx]}): {q_v:+.2f}"
+                t_act = p.addUserDebugText(act_line, [anchor_x, anchor_y, z_offset], textColorRGB=col, textSize=size, lifeTime=0)
+                self.nn_ui_ids.append(t_act)
+                z_offset -= 0.22
+        else:
+            t_standby = p.addUserDebugText("STANDBY: Awaiting Neural Model Forward Pass...", [anchor_x, anchor_y, anchor_z - 0.4], textColorRGB=[0.8, 0.8, 0.8], textSize=1.2, lifeTime=0)
+            self.nn_ui_ids.append(t_standby)
+
     def _update_ui(self):
         """Updates Real-Time Digital HUD Status Directly ON the Suspended Glass Board Screen."""
         if not self.render_mode:
@@ -959,6 +1052,7 @@ class BobsWorld3D(gym.Env):
         self._handle_keyboard_events()
         self._handle_mouse_events()
         self._update_camera()
+        self._render_nn_visualizer()
         
         remaining = self.time_manager.get_remaining_time()
         

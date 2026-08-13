@@ -81,8 +81,21 @@ class DQNAgent:
     def act(self, state, stuck=False, on_ground=True, eval_mode=False):
         """
         Select action using epsilon-greedy policy across 5 3D Spatial Actions.
-        Action 4 (Jump) is strictly disallowed when in mid-air.
+        Captures live layer activations (h1, h2, Q-values) for HUD visualization.
         """
+        state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+        self.policy_net.eval()
+        with torch.no_grad():
+            q_values_tensor, activations = self.policy_net(state_tensor, return_activations=True)
+            q_values = q_values_tensor.squeeze(0).clone()
+            self.latest_activations = {
+                'input': state,
+                'h1': activations['hidden1'].cpu().numpy()[0],
+                'h2': activations['hidden2'].cpu().numpy()[0],
+                'q_values': q_values.cpu().numpy()
+            }
+        self.policy_net.train()
+
         if stuck:
             act_idx = random.choice([0, 1, 2, 3, 4]) if on_ground else random.choice([0, 1, 2, 3])
             self.last_actions.append(act_idx)
@@ -95,16 +108,8 @@ class DQNAgent:
             act_idx = random.choice([0, 1, 2, 3, 4]) if on_ground else random.choice([0, 1, 2, 3])
         else:
             # Exploitation
-            state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-            self.policy_net.eval()
-            with torch.no_grad():
-                q_values = self.policy_net(state_tensor).squeeze(0)
-            self.policy_net.train()
-            
-            # STRICT RULE: Mask out Jump action (index 4) if Bob is in mid-air!
             if not on_ground:
                 q_values[4] = -float('inf')
-                
             act_idx = torch.argmax(q_values).item()
         
         self.last_actions.append(act_idx)

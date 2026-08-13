@@ -49,11 +49,39 @@ class DuelingDQN(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
         
-    def forward(self, state):
-        features = self.feature(state)
-        values = self.value_stream(features)
-        advantages = self.advantage_stream(features)
+    def forward(self, state, return_activations=False):
+        # Layer 1
+        x1 = self.feature[0](state)
+        x1_norm = self.feature[1](x1)
+        a1 = self.feature[2](x1_norm)
+        
+        # Layer 2
+        x2 = self.feature[3](a1)
+        x2_norm = self.feature[4](x2)
+        a2 = self.feature[5](x2_norm)
+        
+        # Value Stream
+        v1 = self.value_stream[0](a2)
+        v1_act = self.value_stream[1](v1)
+        val = self.value_stream[2](v1_act)
+        
+        # Advantage Stream
+        adv1 = self.advantage_stream[0](a2)
+        adv1_act = self.advantage_stream[1](adv1)
+        adv = self.advantage_stream[2](adv1_act)
         
         # Combine V(s) and A(s, a) with mean subtraction
-        q_values = values + (advantages - advantages.mean(dim=-1, keepdim=True))
+        q_values = val + (adv - adv.mean(dim=-1, keepdim=True))
+        
+        if return_activations:
+            activations = {
+                'input': state,
+                'hidden1': a1,
+                'hidden2': a2,
+                'value': val,
+                'advantage': adv,
+                'q_values': q_values
+            }
+            return q_values, activations
+            
         return q_values
