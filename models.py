@@ -42,10 +42,10 @@ class DuelingDQN(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        """Initializes linear layers with small Gaussian noise N(0, 0.01) so Bob starts completely dumb and un-biased."""
+        """Initializes linear layers using Kaiming Uniform initialization for stable Deep Q-learning."""
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, mean=0.0, std=0.01)
+                nn.init.kaiming_uniform_(m.weight, nonlinearity='relu')
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
         

@@ -1060,22 +1060,33 @@ class BobsWorld3D(gym.Env):
             self._update_ui()
             
         obs = self._get_observation()
-        bob_vel, _ = p.getBaseVelocity(self.bob)
         
-        reward = dist_moved * 15.0 + max(0.0, bob_vel[0]) * 0.10
+        # PLATE-FIRST DISTANCE PROGRESS REWARD
+        unactive_plates = [p_item for p_item in self.pressure_plates if not p_item['activated']]
+        if unactive_plates:
+            unactive_plates.sort(key=lambda p_item: math.sqrt((bob_pos[0] - p_item['pos'][0])**2 + (bob_pos[1] - p_item['pos'][1])**2))
+            target_p = unactive_plates[0]['pos']
+            curr_target_dist = math.sqrt((bob_pos[0] - target_p[0])**2 + (bob_pos[1] - target_p[1])**2)
+        else:
+            curr_target_dist = math.sqrt((bob_pos[0] - self.target_x)**2 + (bob_pos[1] - self.target_y)**2)
+            
+        dist_progress = getattr(self, 'prev_target_dist', curr_target_dist) - curr_target_dist
+        self.prev_target_dist = curr_target_dist
+        
+        reward = dist_progress * 45.0
         
         # Reward bonus for each activated pressure plate
         for i, plate in enumerate(self.pressure_plates):
             if plate['activated'] and i not in self.passed_obstacles:
-                reward += 35.0
+                reward += 80.0
                 self.passed_obstacles.add(i)
                 
-        # Small penalty if stuck against locked exit door panel to encourage turning around
+        # Strong penalty if Bob tries to rush locked exit door before all plates are green!
         if self.door_locked_bumped and not self.all_plates_activated:
-            reward -= 0.50
+            reward -= 15.0
             
         if self.stuck_counter > 40:
-            reward -= 0.25
+            reward -= 0.35
             
         terminated = False
         target_hit = self._check_target_contact()
