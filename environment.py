@@ -515,9 +515,9 @@ class BobsWorld3D(gym.Env):
                 except:
                     pass
             self.exit_sign_id = p.addUserDebugText(
-                "OPEN UNLOCKED", [11.88, self.target_y - 0.42, 1.65],
+                "OPEN", [11.88, self.target_y - 0.35, 1.55],
                 textColorRGB=config.COLORS['door_green_sign'][:3],
-                textSize=2.8, lifeTime=0
+                textSize=1.0, lifeTime=0
             )
 
         if self.door_opening and not self.door_open:

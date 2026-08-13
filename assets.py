@@ -252,9 +252,9 @@ def create_exit_door(door_x, door_y):
     )
 
     exit_sign_id = p.addUserDebugText(
-        "LOCKED", [11.88, door_y - 0.42, 1.65],
+        "LOCKED", [11.88, door_y - 0.35, 1.55],
         textColorRGB=config.COLORS['door_red_sign'][:3],
-        textSize=2.6, lifeTime=0
+        textSize=1.0, lifeTime=0
     )
 
     return door_panel_id, target_id, exit_sign_id

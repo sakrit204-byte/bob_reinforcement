@@ -88,8 +88,6 @@ class DigitalBoardScreen:
                 draw.rectangle([bar_x + 1, bar_y + 1, bar_x + fill_w, bar_y + bar_h - 1],
                                fill=(50, 255, 120, 200))
 
-        # Flip for PyBullet UV mapping
-        img = img.transpose(Image.FLIP_LEFT_RIGHT)
         img.save(self.save_path)
         return self.save_path, True
 
@@ -169,8 +167,6 @@ class DoorStatusScreen:
         tw = bbox[2] - bbox[0]
         draw.text(((W - tw) // 2, 212), "SECONDS", fill=(120, 160, 180), font=font_label)
 
-        # Flip for PyBullet UV mapping
-        img = img.transpose(Image.FLIP_LEFT_RIGHT)
         img.save(self.save_path)
         return self.save_path, True
 
@@ -271,6 +267,5 @@ class NeuralNetworkScreen:
 
         draw.text((10, H - 22), f"WINNING ACTION: {action_names[best_act]}  |  Q: {q_vals[best_act]:+.2f}  |  PRESS 'N' TO HIDE", fill=(0, 220, 240), font=self.font_label)
 
-        img = img.transpose(Image.FLIP_LEFT_RIGHT)
         img.save(self.save_path)
         return self.save_path, True
