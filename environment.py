@@ -1085,9 +1085,13 @@ class BobsWorld3D(gym.Env):
                 reward += 100.0
                 self.passed_obstacles.add(i)
                 
-        # Penalty if Bob tries to rush locked exit door before all plates are green
+        # HEAVY NEURAL REJECTION PENALTY: Reaching or bumping locked door before clearing all plates
         if self.door_locked_bumped and not self.all_plates_activated:
-            reward -= 15.0
+            reward -= 50.0  # Injects -50.0 penalty into PyTorch Q-target to heavily suppress premature door-rushing
+            
+        if not self.all_plates_activated and bob_pos[0] > 10.0:
+            # Bob is hovering at the far end near the door while plates remain unactive!
+            reward -= 1.50  # Continuous penalty for hanging near the exit door without activating plates
             
         if self.stuck_counter > 40:
             reward -= 0.35
