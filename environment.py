@@ -73,6 +73,7 @@ class DigitalBoardScreen:
         draw.line([25, 160, self.width - 25, 160], fill=(0, 240, 255, 120), width=2)
         draw.text((25, 185), "NEURAL MODEL: ACTIVE  |  PRESS 'N' FOR LIVE NETWORK GRAPH", fill=(0, 220, 255, 255), font=font_small)
         
+        img = img.transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_TOP_BOTTOM)
         img.save(self.save_path)
         return self.save_path, True
 
@@ -181,6 +182,7 @@ class NeuralNetworkScreen:
         # Bottom status
         draw.text((10, H - 22), f"WINNING ACTION: {action_names[best_act]}  |  Q: {q_vals[best_act]:+.2f}  |  PRESS 'N' TO HIDE", fill=(0, 220, 240), font=self.font_label)
 
+        img = img.transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_TOP_BOTTOM)
         img.save(self.save_path)
         return self.save_path, True
 
